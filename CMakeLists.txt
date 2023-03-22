@@ -1,5 +1,37 @@
 cmake_minimum_required(VERSION 3.16)
 
+
+# vcpkg
+include(FetchContent)
+mark_as_advanced(FORCE
+  FETCHCONTENT_BASE_DIR
+  FETCHCONTENT_FULLY_DISCONNECTED
+  FETCHCONTENT_QUIET
+  FETCHCONTENT_UPDATES_DISCONNECTED)
+
+# Require git for download
+find_package(Git REQUIRED)
+
+FetchContent_Declare(vcpkg-download
+  GIT_REPOSITORY https://github.com/microsoft/vcpkg.git
+  GIT_TAG ae59b93af0c1dce4126e963fca5b330662495fa1
+  GIT_SHALLOW TRUE
+  SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/vcpkg)
+FetchContent_GetProperties(vcpkg-download)
+if (NOT vcpkg-download_POPULATED)
+  message(STATUS "Fetch vcpkg ...")
+  FetchContent_Populate(vcpkg-download)
+  mark_as_advanced(FORCE
+    FETCHCONTENT_SOURCE_DIR_VCPKG-DOWNLOAD
+    FETCHCONTENT_UPDATES_DISCONNECTED_VCPKG-DOWNLOAD)
+endif ()
+
+set(VCPKG_BOOTSTRAP_OPTIONS "-disableMetrics")
+set(VCPKG_INSTALL_OPTIONS "--clean-after-build" "--no-print-usage")
+set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_BINARY_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
+set(ENV{VCPKG_FORCE_DOWNLOADED_BINARIES} ON)
+
+
 project(project-iris)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -16,6 +48,7 @@ add_subdirectory(src/External/glfw)
 
 endif()
 
+find_package(HighFive REQUIRED)
 
 add_executable(project-iris "")
 
@@ -24,6 +57,7 @@ target_sources(project-iris
         src/main.cpp
 )
 
+target_link_libraries(project-iris PUBLIC HighFive)
 
 if(USE_GL)
 

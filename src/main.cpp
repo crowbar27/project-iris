@@ -6,6 +6,8 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 
+#include <highfive/H5Easy.hpp>
+
 #include <stdlib.h>
 #include <stdio.h>
  
@@ -61,6 +63,13 @@ int main(void)
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
+
+    H5Easy::File file("example.h5", H5Easy::File::Overwrite);
+
+    int A = 1;
+    H5Easy::dump(file, "/path/to/A", A);
+
+    A = H5Easy::load<int>(file, "/path/to/A");
  
     while (!glfwWindowShouldClose(window))
     {
