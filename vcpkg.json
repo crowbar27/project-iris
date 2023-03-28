@@ -2,6 +2,7 @@
     "name": "project-iris",
     "version-string": "1.0.0",
     "dependencies": [
-      "highfive"
+      "highfive",
+      "cppzmq"
     ]
   }

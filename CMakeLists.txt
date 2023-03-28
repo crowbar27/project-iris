@@ -49,15 +49,17 @@ add_subdirectory(src/External/glfw)
 endif()
 
 find_package(HighFive REQUIRED)
+find_package(cppzmq)
 
 add_executable(project-iris "")
 
 target_sources(project-iris
     PRIVATE
         src/main.cpp
+        src/message_types.h
 )
 
-target_link_libraries(project-iris PUBLIC HighFive)
+target_link_libraries(project-iris PUBLIC HighFive cppzmq)
 
 if(USE_GL)
 
