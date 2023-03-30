@@ -25,25 +25,58 @@ struct DataServer {
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
         publisher.bind("tcp://127.0.0.1:5555");
 
+        // wait for subscribers to connect?
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+        publisher.send(zmq::str_buffer("A"), zmq::send_flags::sndmore);
+        publisher.send(zmq::str_buffer("Debug message in A envelope"));
+
+        send_rate_ = 1;
+        current_data_row_ = 0;
+        is_sending_ = false;
+
         is_running_ = true;
+
+        auto t_0 = std::chrono::high_resolution_clock::now();
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
+
         while (is_running_) {
-            //  Write three messages, each with an envelope and content
-            publisher.send(zmq::str_buffer("A"), zmq::send_flags::sndmore);
-            publisher.send(zmq::str_buffer("Debug message in A envelope"));
 
-            if (!local_data_.empty())
+            if (!local_data_.empty() && is_sending_)
             {
-                publisher.send(zmq::str_buffer("B"), zmq::send_flags::sndmore);
-                publisher.send(zmq::message_t( &(local_data_.front()), sizeof(TrussStructureMessage::RawSensorData) ));
-            }
+                while (elapsed_time + (1.0/send_rate_) < std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count()) {
+                    publisher.send(zmq::str_buffer("B"), zmq::send_flags::sndmore);
+                    publisher.send(zmq::message_t(&(local_data_[current_data_row_++]), sizeof(TrussStructureMessage::RawSensorData)));
+                    elapsed_time += (1.0 / send_rate_);
+                }
 
-            // TODO set according to update rate
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                if (current_data_row_ >= local_data_.size()) {
+                    current_data_row_ = 0;
+                }
+            }
+            else
+            {
+                elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
         }
     }
 
     void stopPublisher() {
         is_running_ = false;
+    }
+
+    void startSending() {
+        is_sending_ = true;
+    }
+
+    void pauseSending() {
+        is_sending_ = false;
+    }
+
+    void resetSending() {
+        is_sending_ = false;
+        current_data_row_ = 0;
     }
 
     void loadLocalDataFromFile(std::string const& filepath) {
@@ -95,6 +128,16 @@ struct DataServer {
                             for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column)
                             {
                                 ImGui::TableSetColumnIndex(column);
+                                if (row == current_data_row_) {
+                                    ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(ImVec4(0.8f, 0.6f, 0.2f, 1)));
+                                }
+                                else
+                                {
+                                    ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg,
+                                        row%2 ? ImGui::GetColorU32(ImVec4(0.4f, 0.4f, 0.4f, 1)) : ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1))
+                                    );
+                                }
+                                
                                 //ImGui::Text("Row %d Column %d", row, column);
                                 ImGui::Text("%04.4f", row_data.data[column]);
                             }
@@ -111,8 +154,9 @@ struct DataServer {
     //std::vector<std::vector<double>> local_data_;
     std::vector<TrussStructureMessage::RawSensorData> local_data_;
 
-    float send_rate_;
-    size_t current_data_row_;
+    std::atomic<float> send_rate_;
+    std::atomic<size_t> current_data_row_;
+    std::atomic_bool is_sending_;
 
     std::atomic_bool is_running_;
 };
@@ -125,30 +169,36 @@ struct DummySubscriber {
         zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
         subscriber.connect("tcp://127.0.0.1:5555");
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-
         //  Opens "A" and "B" envelopes
         subscriber.set(zmq::sockopt::subscribe, "A");
         subscriber.set(zmq::sockopt::subscribe, "B");
 
+        std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
+
         is_running_ = true;
         while (is_running_) {
-            // Receive all parts of the message
-            std::vector<zmq::message_t> recv_msgs;
-            zmq::recv_result_t result =
-                zmq::recv_multipart(subscriber, std::back_inserter(recv_msgs));
-            assert(result && "recv failed");
-            assert(*result == 2);
+            // Poll for incoming messages with 100ms timeout
+            zmq::poll(items,100);
 
-            if (recv_msgs[0].to_string() == "A"){
-                std::cout << "[" << recv_msgs[0].to_string() << "] "
-                    << recv_msgs[1].to_string() << std::endl;
-            }
-            else if (recv_msgs[0].to_string() == "B") {
-                std::cout << "[" << recv_msgs[0].to_string() << "] "
-                    << recv_msgs[1] << std::endl;
+            if (items.front().revents & ZMQ_POLLIN)
+            {
+                // Receive all parts of the message
+                std::vector<zmq::message_t> recv_msgs;
+                zmq::recv_result_t result =
+                    zmq::recv_multipart(subscriber, std::back_inserter(recv_msgs));
+                assert(result && "recv failed");
+                assert(*result == 2);
 
-                received_data_.emplace_back(std::vector<double>(recv_msgs[1].data<double>(), recv_msgs[1].data<double>() + (recv_msgs[1].size() / sizeof(double))));
+                if (recv_msgs[0].to_string() == "A") {
+                    std::cout << "[" << recv_msgs[0].to_string() << "] "
+                        << recv_msgs[1].to_string() << std::endl;
+                }
+                else if (recv_msgs[0].to_string() == "B") {
+                    std::cout << "[" << recv_msgs[0].to_string() << "] "
+                        << recv_msgs[1] << std::endl;
+
+                    received_data_.push_back( *(recv_msgs[1].data<TrussStructureMessage::RawSensorData>()) );
+                }
             }
         }
     }
@@ -165,19 +215,23 @@ struct DummySubscriber {
 
         if(!received_data_.empty()){
             if (ImGui::Begin("Local HDF5 data)")) {
-                if (ImGui::BeginTable("/meas_data", received_data_.front().size(), flags))
+                if (ImGui::BeginTable("/meas_data", TrussStructureMessage::sensor_cnt, flags))
                 {
+                    for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column) {
+                        ImGui::TableSetupColumn(TrussStructureMessage::sensor_labels[column].c_str());
+                    }
+                    ImGui::TableHeadersRow();
                     ImGuiListClipper clipper;
                     clipper.Begin(received_data_.size());
                     while (clipper.Step()) {
                         for (auto row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
                             ImGui::TableNextRow();
                             auto& row_data = received_data_[row];
-                            for (int column = 0; column < received_data_.front().size(); column++)
+                            for (int column = 0; column < TrussStructureMessage::sensor_cnt; column++)
                             {
                                 ImGui::TableSetColumnIndex(column);
                                 //ImGui::Text("Row %d Column %d", row, column);
-                                ImGui::Text("%04.4f", row_data[column]);
+                                ImGui::Text("%04.4f", row_data.data[column]);
                             }
                         }
                     }
@@ -190,7 +244,7 @@ struct DummySubscriber {
 
     std::atomic_bool is_running_;
 
-    std::vector<std::vector<double>> received_data_;
+    std::vector<TrussStructureMessage::RawSensorData> received_data_;
 };
 
 
@@ -259,8 +313,8 @@ int main(void)
     DataServer server;
     DummySubscriber dummy_subscriber;
 
-    bool server_mode = false;
-    auto a = std::async(std::launch::async, &DummySubscriber::startSubscriber, &dummy_subscriber, &ctx);
+    bool server_mode = true;
+    auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx);
  
     while (!glfwWindowShouldClose(window))
     {
@@ -282,6 +336,7 @@ int main(void)
         ImGui::SetNextWindowSize(ImVec2(width, height));
         ImGui::SetNextWindowPos(ImVec2(0.0, 0.0));
         ImGui::Begin("ControlPanel", &control_panel_is_open, flags);
+        ImGui::Text("Mode");
         if (ImGui::RadioButton("Server", server_mode)) {
             if (!server_mode) {
                 // stop subscriber and start publisher server
@@ -304,16 +359,40 @@ int main(void)
         if (server_mode) {
 
             // Loading local data
-            static char buf1[128] = "C:/Users/micha/Desktop/08-51-23.hdf5";
+            ImGui::Text("Local Data");
+            static char buf1[128] = "08-51-23.hdf5";
             ImGui::InputText("##FilepathInput", buf1, 128);
             ImGui::SameLine();
             if (ImGui::Button("\ue061" " Load")) {
                 server.loadLocalDataFromFile(std::string(buf1));
             }
+
             ImGui::Separator();
 
-            ImGui::Text("Data preview:");
+            ImGui::Text("Server Controls");
+
+            // Server settings
+            if(ImGui::Button("Start")){
+                server.startSending();
+            }
             ImGui::SameLine();
+            if(ImGui::Button("Pause")){
+                server.pauseSending();
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("Reset")){
+                server.resetSending();
+            }
+            ImGui::SameLine();
+            static float send_rate = 1.0f;
+            if (ImGui::DragFloat("Send rate (Hz)", &send_rate, 1.0f, 1.0f, 100.0f)) {
+                server.send_rate_ = send_rate;
+            }
+
+            ImGui::Separator();
+
+            ImGui::Text("Data Preview");
+
             static bool pin_sent_line = false;
             ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
 
