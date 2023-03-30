@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
+#include "message_types.h"
 
 struct DataServer {
     void startPublisher(zmq::context_t* ctx) {
@@ -31,10 +31,10 @@ struct DataServer {
             publisher.send(zmq::str_buffer("A"), zmq::send_flags::sndmore);
             publisher.send(zmq::str_buffer("Debug message in A envelope"));
 
-            if (local_data_file_ != nullptr)
+            if (!local_data_.empty())
             {
                 publisher.send(zmq::str_buffer("B"), zmq::send_flags::sndmore);
-                publisher.send(zmq::message_t(local_data_.front()));
+                publisher.send(zmq::message_t( &(local_data_.front()), sizeof(TrussStructureMessage::RawSensorData) ));
             }
 
             // TODO set according to update rate
@@ -60,10 +60,13 @@ struct DataServer {
             // we get the dataset
             HighFive::DataSet dataset = local_data_file_->getDataSet("/meas_data");
 
-            // we convert the hdf5 dataset to a single dimension vector
-            dataset.read(local_data_);
+            std::vector<std::vector<double>> load_buffer;
+            dataset.read(load_buffer);
 
-            //local_data_ = H5Easy::load<std::vector<double>>((*local_data_file_), "/meas_data");
+            local_data_.resize(load_buffer.size());
+            for (size_t row = 0; row < load_buffer.size(); ++row) {
+                std::memcpy(&local_data_[row].data, load_buffer[row].data(), load_buffer[row].size());
+            }
         }
     }
 
@@ -72,36 +75,41 @@ struct DataServer {
 
         if (local_data_file_ != nullptr)
         {
-            ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable |
+            ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable |
                 ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
                 ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
             
-            if (ImGui::Begin("Local HDF5 data)")) {
-                if (ImGui::BeginTable("/meas_data", local_data_.front().size(), flags))
+            //if (ImGui::Begin("Local HDF5 data)")) {
+                if (ImGui::BeginTable("/meas_data", TrussStructureMessage::sensor_cnt, flags))
                 {
+                    for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column) {
+                        ImGui::TableSetupColumn(TrussStructureMessage::sensor_labels[column].c_str());
+                    }
+                    ImGui::TableHeadersRow();
                     ImGuiListClipper clipper;
                     clipper.Begin(local_data_.size());
                     while (clipper.Step()) {
                         for (auto row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
                             ImGui::TableNextRow();
                             auto& row_data = local_data_[row];
-                            for (int column = 0; column < local_data_.front().size(); column++)
+                            for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column)
                             {
                                 ImGui::TableSetColumnIndex(column);
                                 //ImGui::Text("Row %d Column %d", row, column);
-                                ImGui::Text("%04.4f", row_data[column]);
+                                ImGui::Text("%04.4f", row_data.data[column]);
                             }
                         }
                     }
                     ImGui::EndTable();
                 }
-            }
-            ImGui::End();
+            //}
+            //ImGui::End();
         }
     }
 
     std::unique_ptr<H5Easy::File> local_data_file_;
-    std::vector<std::vector<double>> local_data_;
+    //std::vector<std::vector<double>> local_data_;
+    std::vector<TrussStructureMessage::RawSensorData> local_data_;
 
     float send_rate_;
     size_t current_data_row_;
@@ -232,6 +240,12 @@ int main(void)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
+    ImFontConfig config;
+    config.MergeMode = true;
+    static const ImWchar icon_ranges[] = { '\uE000', '\uF8FF', 0};
+    io.Fonts->AddFontDefault();
+    io.Fonts->AddFontFromFileTTF("../resources/OpenFontIcons.ttf", 24, &config, icon_ranges);
+
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     //ImGui::StyleColorsLight();
@@ -261,8 +275,13 @@ int main(void)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        auto flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+
         bool control_panel_is_open = true;
-        ImGui::Begin("ControlPanel", &control_panel_is_open);
+
+        ImGui::SetNextWindowSize(ImVec2(width, height));
+        ImGui::SetNextWindowPos(ImVec2(0.0, 0.0));
+        ImGui::Begin("ControlPanel", &control_panel_is_open, flags);
         if (ImGui::RadioButton("Server", server_mode)) {
             if (!server_mode) {
                 // stop subscriber and start publisher server
@@ -285,11 +304,18 @@ int main(void)
         if (server_mode) {
 
             // Loading local data
-            static char buf1[128] = "Z:/05 Projektarbeit/B05/D1244-Sensordaten/2023-01-17/08-51-23.hdf5";
-            ImGui::InputText("Local filepath", buf1, 128);
-            if (ImGui::Button("Load")) {
+            static char buf1[128] = "C:/Users/micha/Desktop/08-51-23.hdf5";
+            ImGui::InputText("##FilepathInput", buf1, 128);
+            ImGui::SameLine();
+            if (ImGui::Button("\ue061" " Load")) {
                 server.loadLocalDataFromFile(std::string(buf1));
             }
+            ImGui::Separator();
+
+            ImGui::Text("Data preview:");
+            ImGui::SameLine();
+            static bool pin_sent_line = false;
+            ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
 
             server.previewLocalData();
         }

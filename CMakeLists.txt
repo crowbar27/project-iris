@@ -14,7 +14,7 @@ find_package(Git REQUIRED)
 
 FetchContent_Declare(vcpkg-download
   GIT_REPOSITORY https://github.com/microsoft/vcpkg.git
-  GIT_TAG ae59b93af0c1dce4126e963fca5b330662495fa1
+  GIT_TAG 9659713285b917406c69d17a43dc4901010766fb
   GIT_SHALLOW TRUE
   SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/vcpkg)
 FetchContent_GetProperties(vcpkg-download)
