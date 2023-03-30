@@ -244,7 +244,7 @@ int main(void)
     config.MergeMode = true;
     static const ImWchar icon_ranges[] = { '\uE000', '\uF8FF', 0};
     io.Fonts->AddFontDefault();
-    io.Fonts->AddFontFromFileTTF("../resources/OpenFontIcons.ttf", 24, &config, icon_ranges);
+    //io.Fonts->AddFontFromFileTTF("../resources/OpenFontIcons.ttf", 24, &config, icon_ranges);
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
