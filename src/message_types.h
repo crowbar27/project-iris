@@ -1,5 +1,9 @@
 
-namespace TrussStructureMessage{
+struct TrussStructureMessage {
+
+    typedef double InternalFormat;
+
+    static constexpr std::string envelope() { return "TS"; }
 
     static const size_t sensor_cnt = 244;
 
@@ -250,7 +254,8 @@ namespace TrussStructureMessage{
         CAM_32_4_NO_Y
     };
 
-    static const std::string sensor_labels[sensor_cnt] = {
+    static constexpr std::string getLabel(SensorID id) {
+        std::string sensor_labels[sensor_cnt] = {
         "mod_1_numvars",
         "mod_1_timestamp",
         "mod_1_elong_1",
@@ -494,16 +499,17 @@ namespace TrussStructureMessage{
         "cam_29_4_nw_z",
         "cam_30_4_nw_y",
         "cam_31_4_no_z",
-        "cam_32_4_no_y",
+        "cam_32_4_no_y"
+        };
+
+        return sensor_labels[static_cast<size_t>(id)];
+    }
+
+    struct RawSensorData
+    {
+        double data[sensor_cnt];
+
+        constexpr double getValue(SensorID id) { return data[static_cast<size_t>(id)]; }
     };
 
-struct RawSensorData
-{
-    double data[sensor_cnt];
-
-    constexpr double getValue(SensorID id) { return data[static_cast<size_t>(id)]; }
-
-    constexpr std::string getLabel(SensorID id) { return sensor_labels[static_cast<size_t>(id)]; }
 };
-
-}
