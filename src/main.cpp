@@ -23,7 +23,7 @@ struct DataServer {
 
         //  Prepare publisher
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-        publisher.bind("tcp://127.0.0.1:5555");
+        publisher.bind("tcp://129.69.205.56:5555");
 
         // wait for subscribers to connect?
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -45,7 +45,7 @@ struct DataServer {
             if (!local_data_.empty() && is_sending_)
             {
                 while (elapsed_time + (1.0/send_rate_) < std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count()) {
-                    publisher.send(zmq::str_buffer("B"), zmq::send_flags::sndmore);
+                    publisher.send(zmq::message_t(TrussStructureMessage::envelope().data(),TrussStructureMessage::envelope().size()), zmq::send_flags::sndmore);
                     publisher.send(zmq::message_t(&(local_data_[current_data_row_++]), sizeof(TrussStructureMessage::RawSensorData)));
                     elapsed_time += (1.0 / send_rate_);
                 }
@@ -116,7 +116,7 @@ struct DataServer {
                 if (ImGui::BeginTable("/meas_data", TrussStructureMessage::sensor_cnt, flags))
                 {
                     for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column) {
-                        ImGui::TableSetupColumn(TrussStructureMessage::sensor_labels[column].c_str());
+                        ImGui::TableSetupColumn(TrussStructureMessage::getLabel(column).c_str());
                     }
                     ImGui::TableHeadersRow();
                     ImGuiListClipper clipper;
@@ -218,7 +218,7 @@ struct DummySubscriber {
                 if (ImGui::BeginTable("/meas_data", TrussStructureMessage::sensor_cnt, flags))
                 {
                     for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column) {
-                        ImGui::TableSetupColumn(TrussStructureMessage::sensor_labels[column].c_str());
+                        ImGui::TableSetupColumn(TrussStructureMessage::getLabel(column).c_str());
                     }
                     ImGui::TableHeadersRow();
                     ImGuiListClipper clipper;
