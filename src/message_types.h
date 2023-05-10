@@ -1,3 +1,7 @@
+#ifndef message_types_h
+#define message_types_h
+
+#include <string>
 
 struct TrussStructureMessage {
 
@@ -517,3 +521,5 @@ struct TrussStructureMessage {
     };
 
 };
+
+#endif // !message_types_h
