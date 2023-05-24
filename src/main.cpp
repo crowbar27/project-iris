@@ -23,7 +23,8 @@ struct DataServer {
 
         //  Prepare publisher
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-        publisher.bind("tcp://129.69.205.56:5555");
+        //publisher.bind("tcp://129.69.205.56:5555");
+        publisher.bind("tcp://127.0.0.1:5555");
 
         // wait for subscribers to connect?
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -171,7 +172,7 @@ struct DummySubscriber {
 
         //  Opens "A" and "B" envelopes
         subscriber.set(zmq::sockopt::subscribe, "A");
-        subscriber.set(zmq::sockopt::subscribe, "B");
+        subscriber.set(zmq::sockopt::subscribe, TrussStructureMessage::envelope());
 
         std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
 
@@ -193,7 +194,7 @@ struct DummySubscriber {
                     std::cout << "[" << recv_msgs[0].to_string() << "] "
                         << recv_msgs[1].to_string() << std::endl;
                 }
-                else if (recv_msgs[0].to_string() == "B") {
+                else if (recv_msgs[0].to_string() == TrussStructureMessage::envelope()) {
                     std::cout << "[" << recv_msgs[0].to_string() << "] "
                         << recv_msgs[1] << std::endl;
 
