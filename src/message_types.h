@@ -1,6 +1,7 @@
 #ifndef message_types_h
 #define message_types_h
 
+#include <array>
 #include <string>
 
 struct TrussStructureMessage {
@@ -520,6 +521,22 @@ struct TrussStructureMessage {
         constexpr double getValue(SensorID id) { return data[static_cast<size_t>(id)]; }
     };
 
+};
+
+/**
+* Messeage type for communicatong the pose (position + orientation)
+* and viewing frustrum of a (human) operator in the MR scene.
+*/
+struct OperatorPose {
+
+    static constexpr std::string envelope() { return "OL"; }
+
+    struct RawData
+    {
+        std::array<float, 3> position; // 3d position
+        std::array<float, 4> orientation; // orientation given as quaternion
+        std::array<float, 2> fov; // view frustrum given as horizontal and vertical field of view
+    };
 };
 
 #endif // !message_types_h
