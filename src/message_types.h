@@ -535,7 +535,7 @@ struct OperatorPose {
     {
         std::array<float, 3> position; // 3d position
         std::array<float, 4> orientation; // orientation given as quaternion
-        std::array<float, 2> fov; // view frustrum given as horizontal and vertical field of view
+        std::array<float, 3> gaze_ray; // additional directional vector for eye gaze
     };
 };
 
