@@ -44,8 +44,8 @@ struct TrussStructureMessage {
         MOD_1_ELONG_27,
         MOD_1_ELONG_28,
         MOD_1_ELONG_29,
-        MOD_1_ELONG_31,
         MOD_1_ELONG_30,
+        MOD_1_ELONG_31,
         MOD_1_ELONG_32,
         MOD_1_PRESSURE_1_X,
         MOD_1_PRESSURE_1_Y,
@@ -292,8 +292,8 @@ struct TrussStructureMessage {
         "mod_1_elong_27",
         "mod_1_elong_28",
         "mod_1_elong_29",
-        "mod_1_elong_31",
         "mod_1_elong_30",
+        "mod_1_elong_31",
         "mod_1_elong_32",
         "mod_1_pressure_1_x",
         "mod_1_pressure_1_y",
@@ -524,18 +524,22 @@ struct TrussStructureMessage {
 };
 
 /**
-* Messeage type for communicatong the pose (position + orientation)
-* and viewing frustrum of a (human) operator in the MR scene.
+* Message type for communicatong the pose (position + orientation)
+* and eye gaze ray of a (human) operator in the MR scene.
 */
-struct OperatorPose {
+struct OperatorPoseMessage {
 
-    static constexpr std::string envelope() { return "OL"; }
+    static constexpr std::string envelope() { return "OP"; }
+
+    static constexpr std::array<float, 2> getFov() {
+        return {43.0,29.0};
+    }
 
     struct RawData
     {
-        std::array<float, 3> position; // 3d position
-        std::array<float, 4> orientation; // orientation given as quaternion
-        std::array<float, 3> gaze_ray; // additional directional vector for eye gaze
+        std::array<float, 3> position; // 3d position (x,y,z)
+        std::array<float, 4> orientation; // orientation given as quaternion (w,x,y,z)
+        std::array<float, 3> gaze_ray; // additional directional vector for eye gaze (x,y,z)
     };
 };
 
