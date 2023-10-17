@@ -23,8 +23,8 @@ struct DataServer {
 
         //  Prepare publisher
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-        //publisher.bind("tcp://129.69.205.56:5555");
-        publisher.bind("tcp://127.0.0.1:5555");
+        publisher.bind("tcp://129.69.205.56:5555");
+        //publisher.bind("tcp://127.0.0.1:5555");
 
         // wait for subscribers to connect?
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -248,8 +248,114 @@ struct DummySubscriber {
     std::vector<TrussStructureMessage::RawSensorData> received_data_;
 };
 
+/**
+* Contains a subsriber for receiving operator pose data from HoloLens
+* and a publisher to forward the pose data to Unreal
+*/
+struct OperatorPoseServer
+{
+    void start(zmq::context_t* ctx)
+    {
+        //  Prepare subscriber
+        zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
+        subscriber.bind("tcp://129.69.205.56:5555"); // bind to own IP adress, while HoloLens will connect to this adress
 
- 
+        //  Opens OperatorPoseMessage envelope
+        subscriber.set(zmq::sockopt::subscribe, OperatorPoseMessage::envelope());
+
+        std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
+
+        is_running_ = true;
+        while (is_running_) {
+            // Poll for incoming messages with 100ms timeout
+            zmq::poll(items, 100);
+
+            if (items.front().revents & ZMQ_POLLIN)
+            {
+                // Receive all parts of the message
+                std::vector<zmq::message_t> recv_msgs;
+                zmq::recv_result_t result =
+                    zmq::recv_multipart(subscriber, std::back_inserter(recv_msgs));
+                assert(result && "recv failed");
+                assert(*result == 2);
+
+                if (recv_msgs[0].to_string() == OperatorPoseMessage::envelope()) {
+                    std::cout << "[" << recv_msgs[0].to_string() << "] "
+                        << recv_msgs[1] << std::endl;
+
+                    received_data_.push_back(*(recv_msgs[1].data<OperatorPoseMessage::RawData>()));
+
+                    //TODO forward message if not using local file
+                }
+            }
+        }
+    }
+
+    void showReceivedData() {
+        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable |
+            ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
+            ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+
+        if (!received_data_.empty()) {
+            if (ImGui::Begin("Received data")) {
+                int columm_cnt = 10;/* number of floats in each OperatorPoseMessage */
+                if (ImGui::BeginTable("Operator pose", columm_cnt, flags))
+                {
+                    ImGui::TableSetupColumn("Position x");
+                    ImGui::TableSetupColumn("Position y");
+                    ImGui::TableSetupColumn("Position z");
+                    ImGui::TableSetupColumn("Orientation x");
+                    ImGui::TableSetupColumn("Orientation y");
+                    ImGui::TableSetupColumn("Orientation z");
+                    ImGui::TableSetupColumn("Orientation w");
+                    ImGui::TableSetupColumn("Gaze x");
+                    ImGui::TableSetupColumn("Gaze y");
+                    ImGui::TableSetupColumn("Gaze z");
+
+                    ImGui::TableHeadersRow();
+                    ImGuiListClipper clipper;
+                    clipper.Begin(received_data_.size());
+                    while (clipper.Step()) {
+                        for (auto row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+                            ImGui::TableNextRow();
+                            auto& row_data = received_data_[row];
+
+                            ImGui::TableSetColumnIndex(0);
+                            ImGui::Text("%04.4f", row_data.position[0]);
+                            ImGui::TableSetColumnIndex(1);
+                            ImGui::Text("%04.4f", row_data.position[1]);
+                            ImGui::TableSetColumnIndex(2);
+                            ImGui::Text("%04.4f", row_data.position[2]);
+
+                            ImGui::TableSetColumnIndex(3);
+                            ImGui::Text("%04.4f", row_data.orientation[0]);
+                            ImGui::TableSetColumnIndex(4);
+                            ImGui::Text("%04.4f", row_data.orientation[1]);
+                            ImGui::TableSetColumnIndex(5);
+                            ImGui::Text("%04.4f", row_data.orientation[2]);
+                            ImGui::TableSetColumnIndex(6);
+                            ImGui::Text("%04.4f", row_data.orientation[3]);
+
+                            ImGui::TableSetColumnIndex(7);
+                            ImGui::Text("%04.4f", row_data.gaze_ray[0]);
+                            ImGui::TableSetColumnIndex(8);
+                            ImGui::Text("%04.4f", row_data.gaze_ray[1]);
+                            ImGui::TableSetColumnIndex(9);
+                            ImGui::Text("%04.4f", row_data.gaze_ray[2]);
+                        }
+                    }
+                    ImGui::EndTable();
+                }
+            }
+            ImGui::End();
+        }
+    }
+
+    std::vector<OperatorPoseMessage::RawData> received_data_;
+
+    std::atomic_bool is_running_;
+};
+
 static void error_callback(int error, const char* description)
 {
     fprintf(stderr, "Error: %s\n", description);
@@ -313,9 +419,12 @@ int main(void)
 
     DataServer server;
     DummySubscriber dummy_subscriber;
+    OperatorPoseServer operator_pose_server;
 
     bool server_mode = true;
     auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx);
+
+    auto ops_exec = std::async(std::launch::async, &OperatorPoseServer::start, &operator_pose_server, &ctx);
  
     while (!glfwWindowShouldClose(window))
     {
@@ -337,71 +446,136 @@ int main(void)
         ImGui::SetNextWindowSize(ImVec2(width, height));
         ImGui::SetNextWindowPos(ImVec2(0.0, 0.0));
         ImGui::Begin("ControlPanel", &control_panel_is_open, flags);
-        ImGui::Text("Mode");
-        if (ImGui::RadioButton("Server", server_mode)) {
-            if (!server_mode) {
-                // stop subscriber and start publisher server
-                dummy_subscriber.stopSubscriber();
-                a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx);
+
+
+        ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_FittingPolicyDefault_;
+        if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags))
+        {
+            if (ImGui::BeginTabItem("Truss Structure Publisher"))
+            {
+                {
+                    // Loading local data
+                    ImGui::Text("Local Data");
+                    static char buf1[128] = "08-51-23.hdf5";
+                    ImGui::InputText("##FilepathInput", buf1, 128);
+                    ImGui::SameLine();
+                    if (ImGui::Button("\ue061" " Load")) {
+                        server.loadLocalDataFromFile(std::string(buf1));
+                    }
+                    
+                    ImGui::Separator();
+                    
+                    ImGui::Text("Server Controls");
+                    
+                    // Server settings
+                    if(ImGui::Button("Start")){
+                        server.startSending();
+                    }
+                    ImGui::SameLine();
+                    if(ImGui::Button("Pause")){
+                        server.pauseSending();
+                    }
+                    ImGui::SameLine();
+                    if(ImGui::Button("Reset")){
+                        server.resetSending();
+                    }
+                    ImGui::SameLine();
+                    static float send_rate = 1.0f;
+                    if (ImGui::DragFloat("Send rate (Hz)", &send_rate, 1.0f, 1.0f, 100.0f)) {
+                        server.send_rate_ = send_rate;
+                    }
+                    
+                    ImGui::Separator();
+                    
+                    ImGui::Text("Data Preview");
+                    
+                    static bool pin_sent_line = false;
+                    ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
+                    
+                    server.previewLocalData();
+                }
+
+                ImGui::EndTabItem();
             }
-            server_mode = true;
+            if (ImGui::BeginTabItem("Operator Pose Subscriber"))
+            {
+                operator_pose_server.showReceivedData();
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Operator Pose Forwarding"))
+            {
+                ImGui::Text("This is the Cucumber tab!\nblah blah blah blah blah");
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
         }
-        ImGui::SameLine();
-        if (ImGui::RadioButton("Subscriber", !server_mode)) {
-            if (server_mode) {
-                // stop publisher server and start subscriver
-                server.stopPublisher();
-                a = std::async(std::launch::async, &DummySubscriber::startSubscriber, &dummy_subscriber, &ctx);
-            }
-            server_mode = false;
-        }
-        ImGui::Separator();
 
-        if (server_mode) {
 
-            // Loading local data
-            ImGui::Text("Local Data");
-            static char buf1[128] = "08-51-23.hdf5";
-            ImGui::InputText("##FilepathInput", buf1, 128);
-            ImGui::SameLine();
-            if (ImGui::Button("\ue061" " Load")) {
-                server.loadLocalDataFromFile(std::string(buf1));
-            }
-
-            ImGui::Separator();
-
-            ImGui::Text("Server Controls");
-
-            // Server settings
-            if(ImGui::Button("Start")){
-                server.startSending();
-            }
-            ImGui::SameLine();
-            if(ImGui::Button("Pause")){
-                server.pauseSending();
-            }
-            ImGui::SameLine();
-            if(ImGui::Button("Reset")){
-                server.resetSending();
-            }
-            ImGui::SameLine();
-            static float send_rate = 1.0f;
-            if (ImGui::DragFloat("Send rate (Hz)", &send_rate, 1.0f, 1.0f, 100.0f)) {
-                server.send_rate_ = send_rate;
-            }
-
-            ImGui::Separator();
-
-            ImGui::Text("Data Preview");
-
-            static bool pin_sent_line = false;
-            ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
-
-            server.previewLocalData();
-        }
-        else {
-            dummy_subscriber.showReceivedData();
-        }
+        //  ImGui::Text("Mode");
+        //  if (ImGui::RadioButton("Server", server_mode)) {
+        //      if (!server_mode) {
+        //          // stop subscriber and start publisher server
+        //          dummy_subscriber.stopSubscriber();
+        //          a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx);
+        //      }
+        //      server_mode = true;
+        //  }
+        //  ImGui::SameLine();
+        //  if (ImGui::RadioButton("Subscriber", !server_mode)) {
+        //      if (server_mode) {
+        //          // stop publisher server and start subscriver
+        //          server.stopPublisher();
+        //          a = std::async(std::launch::async, &DummySubscriber::startSubscriber, &dummy_subscriber, &ctx);
+        //      }
+        //      server_mode = false;
+        //  }
+        //  ImGui::Separator();
+        //  
+        //  if (server_mode) {
+        //  
+        //      // Loading local data
+        //      ImGui::Text("Local Data");
+        //      static char buf1[128] = "08-51-23.hdf5";
+        //      ImGui::InputText("##FilepathInput", buf1, 128);
+        //      ImGui::SameLine();
+        //      if (ImGui::Button("\ue061" " Load")) {
+        //          server.loadLocalDataFromFile(std::string(buf1));
+        //      }
+        //  
+        //      ImGui::Separator();
+        //  
+        //      ImGui::Text("Server Controls");
+        //  
+        //      // Server settings
+        //      if(ImGui::Button("Start")){
+        //          server.startSending();
+        //      }
+        //      ImGui::SameLine();
+        //      if(ImGui::Button("Pause")){
+        //          server.pauseSending();
+        //      }
+        //      ImGui::SameLine();
+        //      if(ImGui::Button("Reset")){
+        //          server.resetSending();
+        //      }
+        //      ImGui::SameLine();
+        //      static float send_rate = 1.0f;
+        //      if (ImGui::DragFloat("Send rate (Hz)", &send_rate, 1.0f, 1.0f, 100.0f)) {
+        //          server.send_rate_ = send_rate;
+        //      }
+        //  
+        //      ImGui::Separator();
+        //  
+        //      ImGui::Text("Data Preview");
+        //  
+        //      static bool pin_sent_line = false;
+        //      ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
+        //  
+        //      server.previewLocalData();
+        //  }
+        //  else {
+        //      dummy_subscriber.showReceivedData();
+        //  }
 
         ImGui::End();
 
