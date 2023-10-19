@@ -46,6 +46,8 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build the GLFW documentation")
 set(GLFW_INSTALL OFF CACHE BOOL "Generate installation target")
 add_subdirectory(src/External/glfw)
 
+add_subdirectory(src/External/portable-file-dialogs)
+
 endif()
 
 find_package(HighFive REQUIRED)
@@ -92,6 +94,7 @@ target_include_directories(
         "${PROJECT_SOURCE_DIR}/src/External/glad/include"
         "${PROJECT_SOURCE_DIR}/src/External/glfw/include"
         "${PROJECT_SOURCE_DIR}/src/External/imgui/"
+        "${PROJECT_SOURCE_DIR}/src/External/portable-file-dialogs/"
 )
 
 target_link_libraries(project-iris PUBLIC glfw ${GLFW_LIBRARIES})
