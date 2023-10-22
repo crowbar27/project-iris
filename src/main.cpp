@@ -2,6 +2,8 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui_internal.h"
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -162,6 +164,8 @@ struct DataServer {
     std::atomic_bool is_sending_;
 
     std::atomic_bool is_running_;
+
+    bool use_local_data_;
 };
 
 struct DummySubscriber {
@@ -378,6 +382,86 @@ struct OperatorPoseServer
     bool use_local_data_ = false;
 };
 
+namespace TheiaColorPalette
+{
+    static constexpr ImVec4 white(float alpha = 0.92f) { return ImVec4(1.0f, 1.0f, 1.0f, alpha); }
+
+    static constexpr ImVec4 blue(float alpha = 1.0f) { return ImVec4(0.33f, 0.32f, 1.0f, alpha); }
+
+    static constexpr ImVec4 orange(float alpha = 1.0f) { return ImVec4(1.0f, 0.5f, 0.0f, alpha); }
+
+    static constexpr ImVec4 green(float alpha = 1.0f) { return ImVec4(0.1f, 1.0f, 0.7f, alpha); }
+}
+
+void customImGuiColors()
+{
+    ImGuiStyle* style = &ImGui::GetStyle();
+    ImVec4* colors = style->Colors;
+
+    //colors[ImGuiCol_Text] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_Text] = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
+    colors[ImGuiCol_WindowBg] = ImVec4(0.06f, 0.06f, 0.06f, 0.94f);
+    colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_PopupBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.94f);
+    colors[ImGuiCol_Border] = TheiaColorPalette::white(0.50f); //ImVec4(0.43f, 0.43f, 0.50f, 0.50f);
+    colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+
+    colors[ImGuiCol_FrameBg] = TheiaColorPalette::white(0.54f); //ImVec4(0.16f, 0.29f, 0.48f, 0.54f);
+    colors[ImGuiCol_FrameBgHovered] = TheiaColorPalette::white(0.67f); //ImVec4(0.26f, 0.59f, 0.98f, 0.40f);
+    colors[ImGuiCol_FrameBgActive] = TheiaColorPalette::white(0.80f); //ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
+
+    colors[ImGuiCol_TitleBg] = TheiaColorPalette::white(0.54f); //ImVec4(0.04f, 0.04f, 0.04f, 1.00f);
+    colors[ImGuiCol_TitleBgActive] = TheiaColorPalette::blue(1.00f); //ImVec4(0.16f, 0.29f, 0.48f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.00f, 0.00f, 0.00f, 0.51f);
+
+    colors[ImGuiCol_MenuBarBg] = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
+    colors[ImGuiCol_ScrollbarBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.53f);
+    colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.31f, 0.31f, 0.31f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.41f, 0.41f, 0.41f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.51f, 0.51f, 0.51f, 1.00f);
+    colors[ImGuiCol_CheckMark] = TheiaColorPalette::white(0.92f); //ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+    colors[ImGuiCol_SliderGrab] = ImVec4(0.24f, 0.52f, 0.88f, 1.00f);
+    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+
+    colors[ImGuiCol_Button] = TheiaColorPalette::white(0.92f); //ImVec4(0.26f, 0.59f, 0.98f, 0.40f);
+    colors[ImGuiCol_ButtonHovered] = TheiaColorPalette::white(1.00f); //ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+    colors[ImGuiCol_ButtonActive] = TheiaColorPalette::blue(1.00f); //ImVec4(0.06f, 0.53f, 0.98f, 1.00f);
+
+    colors[ImGuiCol_Header] = TheiaColorPalette::white(0.54f); //ImVec4(0.26f, 0.59f, 0.98f, 0.31f);
+    colors[ImGuiCol_HeaderHovered] = TheiaColorPalette::white(1.00f); //ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
+    colors[ImGuiCol_HeaderActive] = TheiaColorPalette::white(0.92f); //ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+
+    colors[ImGuiCol_Separator] = colors[ImGuiCol_Border];
+    colors[ImGuiCol_SeparatorHovered] = ImVec4(0.10f, 0.40f, 0.75f, 0.78f);
+    colors[ImGuiCol_SeparatorActive] = ImVec4(0.10f, 0.40f, 0.75f, 1.00f);
+    colors[ImGuiCol_ResizeGrip] = ImVec4(0.26f, 0.59f, 0.98f, 0.20f);
+    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
+    colors[ImGuiCol_ResizeGripActive] = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
+
+    colors[ImGuiCol_Tab] = colors[ImGuiCol_Header];
+    colors[ImGuiCol_TabHovered] = colors[ImGuiCol_HeaderHovered];
+    colors[ImGuiCol_TabActive] = colors[ImGuiCol_HeaderActive];
+    colors[ImGuiCol_TabUnfocused] = ImLerp(colors[ImGuiCol_Tab], colors[ImGuiCol_TitleBg], 0.80f);
+    colors[ImGuiCol_TabUnfocusedActive] = ImLerp(colors[ImGuiCol_TabActive], colors[ImGuiCol_TitleBg], 0.40f);
+
+    colors[ImGuiCol_PlotLines] = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
+    colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
+    colors[ImGuiCol_PlotHistogram] = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
+    colors[ImGuiCol_TableHeaderBg] = ImVec4(0.19f, 0.19f, 0.20f, 1.00f);
+    colors[ImGuiCol_TableBorderStrong] = ImVec4(0.31f, 0.31f, 0.35f, 1.00f);   // Prefer using Alpha=1.0 here
+    colors[ImGuiCol_TableBorderLight] = ImVec4(0.23f, 0.23f, 0.25f, 1.00f);   // Prefer using Alpha=1.0 here
+    colors[ImGuiCol_TableRowBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_TableRowBgAlt] = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
+    colors[ImGuiCol_TextSelectedBg] = ImVec4(0.26f, 0.59f, 0.98f, 0.35f);
+    colors[ImGuiCol_DragDropTarget] = ImVec4(1.00f, 1.00f, 0.00f, 0.90f);
+    colors[ImGuiCol_NavHighlight] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+    colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
+    colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
+    colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
+}
+
 static void error_callback(int error, const char* description)
 {
     fprintf(stderr, "Error: %s\n", description);
@@ -423,15 +507,19 @@ int main(void)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-    ImFontConfig config;
-    config.MergeMode = true;
-    static const ImWchar icon_ranges[] = { '\uE000', '\uF8FF', 0 };
+    ImGuiStyle style = ImGui::GetStyle();
+
+    //ImFontConfig config;
+    //config.MergeMode = true;
+    //static const ImWchar icon_ranges[] = { '\uE000', '\uF8FF', 0 };
     io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("../resources/OpenFontIcons.ttf", 24, &config, icon_ranges);
+    auto aileron_light_font = io.Fonts->AddFontFromFileTTF("../resources/fonts/ProggyVector-Dotted.ttf", 24);
+    //auto aileron_light_font = io.Fonts->AddFontFromFileTTF("../Aileron-Light.ttf", 24, &config, icon_ranges);
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsDark();
     //ImGui::StyleColorsLight();
+    customImGuiColors();
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -462,6 +550,7 @@ int main(void)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        ImGui::PushFont(aileron_light_font);
 
         auto flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 
@@ -471,16 +560,34 @@ int main(void)
         ImGui::SetNextWindowPos(ImVec2(0.0, 0.0));
         ImGui::Begin("ControlPanel", &control_panel_is_open, flags);
 
+        // Gather some numbers for layouting
+        float frame_height = ImGui::GetFrameHeight();
+        float item_inner_spacing = style.ItemInnerSpacing.x;
+        
 
         ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_FittingPolicyDefault_;
         if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags))
         {
+            ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
             if (ImGui::BeginTabItem("Truss Structure Sensor Data"))
             {
                 {
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                    if (ImGui::RadioButton("Live Data", !server.use_local_data_))
+                    {
+                        //server.use_local_data_ = false;
+                        server.use_local_data_ = true;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::RadioButton("Local File", server.use_local_data_))
+                    {
+                        server.use_local_data_ = true;
+                    }
+                    ImGui::PopStyleColor();
+                    ImGui::Separator();
+
                     // Loading local data
-                    ImGui::Text("Local Data");
-                    if (ImGui::Button("\ue061" " Load")) {
+                    if (ImGui::Button("Load Local Data", ImVec2(frame_height * 8.0f + item_inner_spacing * 2.0f, frame_height))) {
 
                         auto selection = pfd::open_file("Select a file").result();
                         if (!selection.empty()){
@@ -493,64 +600,80 @@ int main(void)
 
                     ImGui::Separator();
 
-                    ImGui::Text("Server Controls");
-
                     // Server settings
-                    if (ImGui::Button("Start")) {
+                    if (ImGui::Button("Start", ImVec2(frame_height * 4.0f, frame_height))) {
                         server.startSending();
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Pause")) {
+                    if (ImGui::Button("Pause", ImVec2(frame_height * 4.0f, frame_height))) {
                         server.pauseSending();
                     }
                     ImGui::SameLine();
-                    if (ImGui::Button("Reset")) {
+                    if (ImGui::Button("Reset", ImVec2(frame_height * 4.0f, frame_height))) {
                         server.resetSending();
                     }
-                    ImGui::SameLine();
+
                     static float send_rate = 1.0f;
+                    ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
                     if (ImGui::DragFloat("Send rate (Hz)", &send_rate, 1.0f, 1.0f, 100.0f)) {
                         server.send_rate_ = send_rate;
                     }
+                    ImGui::PopStyleColor();
+
+                    static bool pin_sent_line = false;
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                    ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
+                    ImGui::PopStyleColor();
 
                     ImGui::Separator();
 
-                    ImGui::Text("Data Preview");
-
-                    static bool pin_sent_line = false;
-                    ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
-
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(255, 255, 255, 128));
                     server.previewLocalData();
+                    ImGui::PopStyleColor();
+                    ImGui::PopStyleColor();
                 }
 
                 ImGui::EndTabItem();
             }
+            ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
             if (ImGui::BeginTabItem("Operator Pose Data"))
             {
-                if(ImGui::RadioButton("Live data.", &operator_pose_server.use_local_data_))
+                if(ImGui::RadioButton("Live Data", !operator_pose_server.use_local_data_))
                 {
-                    
+                    operator_pose_server.use_local_data_ = false;
                 }
-                //if(ImGui::RadioButton("Local data.", &use_local_data))
-                //{
-                //    live_data = false;
-                //}
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Local File", operator_pose_server.use_local_data_))
+                {
+                    operator_pose_server.use_local_data_ = true;
+                }
+                ImGui::Separator();
+
+                if (!operator_pose_server.use_local_data_) {
+                    if (ImGui::Button("Save Received Data", ImVec2(frame_height * 8.0f + item_inner_spacing * 2.0f, frame_height))) {
+                        auto selection = pfd::save_file("Select a file").result();;
+                        if (!selection.empty()) {
+                            operator_pose_server.storeReceivedData(selection);
+                        }
+                    }
+                    //TODO forward data option
+                }
+                else
+                {
+                    if (ImGui::Button("Load Local File", ImVec2(frame_height * 8.0f + item_inner_spacing * 2.0f, frame_height))) {
+                        auto selection = pfd::open_file("Select a file").result();;
+                        if (!selection.empty()) {
+                            //TODO load local data
+                        }
+                    }
+                    //TODO forward data settings
+                }
 
                 ImGui::Separator();
-                ImGui::Text("Received data");
-                ImGui::SameLine();
-                if (ImGui::Button("\ue061" " Save")) {
-                    auto selection = pfd::save_file("Select a file").result();;
-                    if (!selection.empty()) {
-                        operator_pose_server.storeReceivedData(selection);
-                    }
-                }
+
                 operator_pose_server.showReceivedData();
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("Operator Pose Forwarding"))
-            {
-                ImGui::Text("This is the Cucumber tab!\nblah blah blah blah blah");
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
@@ -622,7 +745,7 @@ int main(void)
         //  else {
         //      dummy_subscriber.showReceivedData();
         //  }
-
+        ImGui::PopFont();
         ImGui::End();
 
         // Rendering
