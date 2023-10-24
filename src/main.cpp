@@ -21,6 +21,17 @@
 
 #include "message_types.h"
 
+namespace TheiaColorPalette
+{
+    static constexpr ImVec4 white(float alpha = 0.92f) { return ImVec4(1.0f, 1.0f, 1.0f, alpha); }
+
+    static constexpr ImVec4 blue(float alpha = 1.0f) { return ImVec4(0.33f, 0.32f, 1.0f, alpha); }
+
+    static constexpr ImVec4 orange(float alpha = 1.0f) { return ImVec4(1.0f, 0.5f, 0.0f, alpha); }
+
+    static constexpr ImVec4 green(float alpha = 1.0f) { return ImVec4(0.1f, 1.0f, 0.7f, alpha); }
+}
+
 struct DataServer {
     void startPublisher(zmq::context_t* ctx) {
         // TODO simulate publishing of live data
@@ -134,12 +145,12 @@ struct DataServer {
                         {
                             ImGui::TableSetColumnIndex(column);
                             if (row == current_data_row_) {
-                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(ImVec4(0.8f, 0.6f, 0.2f, 1)));
+                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(TheiaColorPalette::orange()));
                             }
                             else
                             {
                                 ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg,
-                                    row % 2 ? ImGui::GetColorU32(ImVec4(0.4f, 0.4f, 0.4f, 1)) : ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1))
+                                    row % 2 ? ImGui::GetColorU32(TheiaColorPalette::white(0.4f)) : ImGui::GetColorU32(TheiaColorPalette::white(0.2f))
                                 );
                             }
 
@@ -264,99 +275,136 @@ struct OperatorPoseServer
     {
         //  Prepare subscriber
         zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
-        subscriber.bind("tcp://129.69.205.56:5555"); // bind to own IP adress, while HoloLens will connect to this adress
+        subscriber.bind("tcp://129.69.205.56:5556"); // bind to own IP adress, while HoloLens will connect to this adress
         //  Opens OperatorPoseMessage envelope
         subscriber.set(zmq::sockopt::subscribe, OperatorPoseMessage::envelope());
 
         // Prepare publisher for message forwarding
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-        publisher.bind("tcp://129.69.205.56:5555");
+        publisher.bind("tcp://129.69.205.56:5557");
 
         std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
 
+        auto t_0 = std::chrono::high_resolution_clock::now();
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
+
+        send_rate_ = 1;
+        current_data_row_ = 0;
         is_running_ = true;
         while (is_running_) {
-            // Poll for incoming messages with 100ms timeout
-            zmq::poll(items, 100);
 
-            if (items.front().revents & ZMQ_POLLIN)
+            if(use_local_data_ && forward_data_ && !local_data_.empty())
             {
-                // Receive all parts of the message
-                std::vector<zmq::message_t> recv_msgs;
-                zmq::recv_result_t result =
-                    zmq::recv_multipart(subscriber, std::back_inserter(recv_msgs));
-                assert(result && "recv failed");
-                assert(*result == 2);
-
-                if (recv_msgs[0].to_string() == OperatorPoseMessage::envelope()) {
-                    std::cout << "[" << recv_msgs[0].to_string() << "] "
-                        << recv_msgs[1] << std::endl;
-
-                    received_data_.push_back(*(recv_msgs[1].data<OperatorPoseMessage::RawData>()));
-
-                    //TODO forward message if not using local file
+                while (elapsed_time + (1.0 / send_rate_) < std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count()) {
+                    publisher.send(zmq::message_t(OperatorPoseMessage::envelope().data(), OperatorPoseMessage::envelope().size()), zmq::send_flags::sndmore);
+                    publisher.send(zmq::message_t(&(local_data_[current_data_row_++]), sizeof(OperatorPoseMessage::RawData)));
+                    elapsed_time += (1.0 / send_rate_);
                 }
+
+                if (current_data_row_ >= local_data_.size()) {
+                    current_data_row_ = 0;
+                }
+            }
+            else
+            {
+                elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                // Poll for incoming messages with 100ms timeout
+                zmq::poll(items, 100);
+
+                if (items.front().revents & ZMQ_POLLIN)
+                {
+                    // Receive all parts of the message
+                    std::vector<zmq::message_t> recv_msgs;
+                    zmq::recv_result_t result =
+                        zmq::recv_multipart(subscriber, std::back_inserter(recv_msgs));
+                    assert(result && "recv failed");
+                    assert(*result == 2);
+
+                    if (recv_msgs[0].to_string() == OperatorPoseMessage::envelope()) {
+                        std::cout << "[" << recv_msgs[0].to_string() << "] "
+                            << recv_msgs[1] << std::endl;
+
+                        received_data_.push_back(*(recv_msgs[1].data<OperatorPoseMessage::RawData>()));
+
+                        // forward message if not using local file
+                    }
+                }
+
             }
         }
     }
 
-    void showReceivedData() {
+    void displayDataTable(std::vector<OperatorPoseMessage::RawData> const& data) {
         ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable |
             ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
             ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
 
         //if (ImGui::Begin("Received data")) {
-            int columm_cnt = 10;/* number of floats in each OperatorPoseMessage */
-            if (ImGui::BeginTable("Operator pose", columm_cnt, flags))
-            {
-                ImGui::TableSetupColumn("Position x");
-                ImGui::TableSetupColumn("Position y");
-                ImGui::TableSetupColumn("Position z");
-                ImGui::TableSetupColumn("Orientation x");
-                ImGui::TableSetupColumn("Orientation y");
-                ImGui::TableSetupColumn("Orientation z");
-                ImGui::TableSetupColumn("Orientation w");
-                ImGui::TableSetupColumn("Gaze x");
-                ImGui::TableSetupColumn("Gaze y");
-                ImGui::TableSetupColumn("Gaze z");
+        int columm_cnt = 10;/* number of floats in each OperatorPoseMessage */
+        if (ImGui::BeginTable("Operator pose", columm_cnt, flags))
+        {
+            ImGui::TableSetupColumn("Position x");
+            ImGui::TableSetupColumn("Position y");
+            ImGui::TableSetupColumn("Position z");
+            ImGui::TableSetupColumn("Orientation x");
+            ImGui::TableSetupColumn("Orientation y");
+            ImGui::TableSetupColumn("Orientation z");
+            ImGui::TableSetupColumn("Orientation w");
+            ImGui::TableSetupColumn("Gaze x");
+            ImGui::TableSetupColumn("Gaze y");
+            ImGui::TableSetupColumn("Gaze z");
 
-                ImGui::TableHeadersRow();
+            ImGui::TableHeadersRow();
 
-                if (!received_data_.empty()) {
-                    ImGuiListClipper clipper;
-                    clipper.Begin(received_data_.size());
-                    while (clipper.Step()) {
-                        for (auto row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
-                            ImGui::TableNextRow();
-                            auto& row_data = received_data_[row];
+            if (!data.empty()) {
+                ImGuiListClipper clipper;
+                clipper.Begin(data.size());
+                while (clipper.Step()) {
+                    for (auto row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+                        ImGui::TableNextRow();
+                        auto& row_data = data[row];
 
-                            ImGui::TableSetColumnIndex(0);
-                            ImGui::Text("%04.4f", row_data.position[0]);
-                            ImGui::TableSetColumnIndex(1);
-                            ImGui::Text("%04.4f", row_data.position[1]);
-                            ImGui::TableSetColumnIndex(2);
-                            ImGui::Text("%04.4f", row_data.position[2]);
-
-                            ImGui::TableSetColumnIndex(3);
-                            ImGui::Text("%04.4f", row_data.orientation[0]);
-                            ImGui::TableSetColumnIndex(4);
-                            ImGui::Text("%04.4f", row_data.orientation[1]);
-                            ImGui::TableSetColumnIndex(5);
-                            ImGui::Text("%04.4f", row_data.orientation[2]);
-                            ImGui::TableSetColumnIndex(6);
-                            ImGui::Text("%04.4f", row_data.orientation[3]);
-
-                            ImGui::TableSetColumnIndex(7);
-                            ImGui::Text("%04.4f", row_data.gaze_ray[0]);
-                            ImGui::TableSetColumnIndex(8);
-                            ImGui::Text("%04.4f", row_data.gaze_ray[1]);
-                            ImGui::TableSetColumnIndex(9);
-                            ImGui::Text("%04.4f", row_data.gaze_ray[2]);
+                        for (int col = 0; col < 10; ++col) {
+                            if (row == current_data_row_) {
+                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(TheiaColorPalette::orange()),col);
+                            }
+                            else
+                            {
+                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg,
+                                    row % 2 ? ImGui::GetColorU32(TheiaColorPalette::white(0.4f)) : ImGui::GetColorU32(TheiaColorPalette::white(0.2f)), col
+                                );
+                            }
                         }
+
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::Text("%04.4f", row_data.position[0]);
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::Text("%04.4f", row_data.position[1]);
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::Text("%04.4f", row_data.position[2]);
+
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::Text("%04.4f", row_data.orientation[0]);
+                        ImGui::TableSetColumnIndex(4);
+                        ImGui::Text("%04.4f", row_data.orientation[1]);
+                        ImGui::TableSetColumnIndex(5);
+                        ImGui::Text("%04.4f", row_data.orientation[2]);
+                        ImGui::TableSetColumnIndex(6);
+                        ImGui::Text("%04.4f", row_data.orientation[3]);
+
+                        ImGui::TableSetColumnIndex(7);
+                        ImGui::Text("%04.4f", row_data.gaze_ray[0]);
+                        ImGui::TableSetColumnIndex(8);
+                        ImGui::Text("%04.4f", row_data.gaze_ray[1]);
+                        ImGui::TableSetColumnIndex(9);
+                        ImGui::Text("%04.4f", row_data.gaze_ray[2]);
                     }
                 }
-                ImGui::EndTable();
             }
+            ImGui::EndTable();
+        }
         //}
         //ImGui::End();
     }
@@ -369,29 +417,64 @@ struct OperatorPoseServer
 
         for (size_t row = 0; row < received_data_.size(); ++row) {
             write_buffer.push_back(std::vector<float>(10));
-            std::memcpy(&(write_buffer[row]), &(received_data_[row]), sizeof(OperatorPoseMessage::RawData));
+            std::memcpy(write_buffer[row].data(), &received_data_[row], sizeof(OperatorPoseMessage::RawData));
         }
 
-        file.createDataSet("OP/data", write_buffer);
+        file.createDataSet("op_pose/data", write_buffer);
+    }
+
+    void loadLocalDataFromFile(std::string const& filepath) {
+
+        // TODO try-catch
+        local_data_file_ = std::make_unique<H5Easy::File>(filepath, H5Easy::File::ReadOnly);
+
+        auto shape = H5Easy::getShape((*local_data_file_), "op_pose/data");
+
+        // check matrix format
+        if (shape.size() == 2) {
+
+            // we get the dataset
+            HighFive::DataSet dataset = local_data_file_->getDataSet("op_pose/data");
+
+            std::vector<std::vector<float>> load_buffer;
+            dataset.read(load_buffer);
+
+            local_data_.resize(load_buffer.size());
+            for (size_t row = 0; row < load_buffer.size(); ++row) {
+                std::memcpy(&local_data_[row], load_buffer[row].data(), load_buffer[row].size());
+            }
+        }
+    }
+
+    void startSending() {
+        forward_data_ = true;
+    }
+
+    void pauseSending() {
+        forward_data_ = false;
+    }
+
+    void resetSending() {
+        forward_data_ = false;
+        current_data_row_ = 0;
     }
 
     std::vector<OperatorPoseMessage::RawData> received_data_;
 
     std::atomic_bool is_running_;
 
-    bool use_local_data_ = false;
+    std::atomic_bool forward_data_;
+
+    std::atomic_bool use_local_data_;
+
+    std::unique_ptr<H5Easy::File> local_data_file_;
+
+    std::vector<OperatorPoseMessage::RawData> local_data_;
+
+    std::atomic<float> send_rate_;
+
+    std::atomic<size_t> current_data_row_;
 };
-
-namespace TheiaColorPalette
-{
-    static constexpr ImVec4 white(float alpha = 0.92f) { return ImVec4(1.0f, 1.0f, 1.0f, alpha); }
-
-    static constexpr ImVec4 blue(float alpha = 1.0f) { return ImVec4(0.33f, 0.32f, 1.0f, alpha); }
-
-    static constexpr ImVec4 orange(float alpha = 1.0f) { return ImVec4(1.0f, 0.5f, 0.0f, alpha); }
-
-    static constexpr ImVec4 green(float alpha = 1.0f) { return ImVec4(0.1f, 1.0f, 0.7f, alpha); }
-}
 
 void customImGuiColors()
 {
@@ -640,6 +723,7 @@ int main(void)
             ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
             if (ImGui::BeginTabItem("Operator Pose Data"))
             {
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
                 if(ImGui::RadioButton("Live Data", !operator_pose_server.use_local_data_))
                 {
                     operator_pose_server.use_local_data_ = false;
@@ -649,6 +733,7 @@ int main(void)
                 {
                     operator_pose_server.use_local_data_ = true;
                 }
+                ImGui::PopStyleColor();
                 ImGui::Separator();
 
                 if (!operator_pose_server.use_local_data_) {
@@ -665,86 +750,60 @@ int main(void)
                     if (ImGui::Button("Load Local File", ImVec2(frame_height * 8.0f + item_inner_spacing * 2.0f, frame_height))) {
                         auto selection = pfd::open_file("Select a file").result();;
                         if (!selection.empty()) {
-                            //TODO load local data
+                            operator_pose_server.loadLocalDataFromFile(selection[0]);
                         }
                     }
-                    //TODO forward data settings
+
+                    ImGui::Separator();
+
+                    // Server settings
+                    if (ImGui::Button("Start", ImVec2(frame_height * 4.0f, frame_height))) {
+                        operator_pose_server.startSending();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Pause", ImVec2(frame_height * 4.0f, frame_height))) {
+                        operator_pose_server.pauseSending();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset", ImVec2(frame_height * 4.0f, frame_height))) {
+                        operator_pose_server.resetSending();
+                    }
+
+                    static float send_rate = 1.0f;
+                    ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                    if (ImGui::DragFloat("Send rate (Hz)", &send_rate, 1.0f, 1.0f, 100.0f)) {
+                        server.send_rate_ = send_rate;
+                    }
+                    ImGui::PopStyleColor();
+
+                    static bool pin_sent_line = false;
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                    ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
+                    ImGui::PopStyleColor();
+
                 }
 
                 ImGui::Separator();
 
-                operator_pose_server.showReceivedData();
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(255, 255, 255, 128));
+                if (!operator_pose_server.use_local_data_)
+                {
+                    operator_pose_server.displayDataTable(operator_pose_server.received_data_);
+                }
+                else
+                {
+                    operator_pose_server.displayDataTable(operator_pose_server.local_data_);
+                }
+                ImGui::PopStyleColor();
+                ImGui::PopStyleColor();
+
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
         }
 
-
-        //  ImGui::Text("Mode");
-        //  if (ImGui::RadioButton("Server", server_mode)) {
-        //      if (!server_mode) {
-        //          // stop subscriber and start publisher server
-        //          dummy_subscriber.stopSubscriber();
-        //          a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx);
-        //      }
-        //      server_mode = true;
-        //  }
-        //  ImGui::SameLine();
-        //  if (ImGui::RadioButton("Subscriber", !server_mode)) {
-        //      if (server_mode) {
-        //          // stop publisher server and start subscriver
-        //          server.stopPublisher();
-        //          a = std::async(std::launch::async, &DummySubscriber::startSubscriber, &dummy_subscriber, &ctx);
-        //      }
-        //      server_mode = false;
-        //  }
-        //  ImGui::Separator();
-        //  
-        //  if (server_mode) {
-        //  
-        //      // Loading local data
-        //      ImGui::Text("Local Data");
-        //      static char buf1[128] = "08-51-23.hdf5";
-        //      ImGui::InputText("##FilepathInput", buf1, 128);
-        //      ImGui::SameLine();
-        //      if (ImGui::Button("\ue061" " Load")) {
-        //          server.loadLocalDataFromFile(std::string(buf1));
-        //      }
-        //  
-        //      ImGui::Separator();
-        //  
-        //      ImGui::Text("Server Controls");
-        //  
-        //      // Server settings
-        //      if(ImGui::Button("Start")){
-        //          server.startSending();
-        //      }
-        //      ImGui::SameLine();
-        //      if(ImGui::Button("Pause")){
-        //          server.pauseSending();
-        //      }
-        //      ImGui::SameLine();
-        //      if(ImGui::Button("Reset")){
-        //          server.resetSending();
-        //      }
-        //      ImGui::SameLine();
-        //      static float send_rate = 1.0f;
-        //      if (ImGui::DragFloat("Send rate (Hz)", &send_rate, 1.0f, 1.0f, 100.0f)) {
-        //          server.send_rate_ = send_rate;
-        //      }
-        //  
-        //      ImGui::Separator();
-        //  
-        //      ImGui::Text("Data Preview");
-        //  
-        //      static bool pin_sent_line = false;
-        //      ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
-        //  
-        //      server.previewLocalData();
-        //  }
-        //  else {
-        //      dummy_subscriber.showReceivedData();
-        //  }
         ImGui::PopFont();
         ImGui::End();
 
