@@ -323,8 +323,8 @@ struct OperatorPoseServer
                     assert(*result == 2);
 
                     if (recv_msgs[0].to_string() == OperatorPoseMessage::envelope()) {
-                        std::cout << "[" << recv_msgs[0].to_string() << "] "
-                            << recv_msgs[1] << std::endl;
+                        //std::cout << "[" << recv_msgs[0].to_string() << "] "
+                        //    << recv_msgs[1] << std::endl;
 
                         received_data_.push_back(*(recv_msgs[1].data<OperatorPoseMessage::RawData>()));
 
@@ -475,6 +475,15 @@ struct OperatorPoseServer
 
     std::atomic<size_t> current_data_row_;
 };
+
+struct EventServer {
+    void start(zmq::context_t* ctx) {
+        //TODO
+    }
+
+    std::vector<EventMessages::LookHereEventMessage::RawData> received_data_;
+};
+
 
 void customImGuiColors()
 {
@@ -706,7 +715,7 @@ int main(void)
 
                     static bool pin_sent_line = false;
                     ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
-                    ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
+                    ImGui::RadioButton("Pin last sent data", &pin_sent_line);
                     ImGui::PopStyleColor();
 
                     ImGui::Separator();
@@ -743,7 +752,12 @@ int main(void)
                             operator_pose_server.storeReceivedData(selection);
                         }
                     }
-                    //TODO forward data option
+
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                    if(ImGui::RadioButton("Forward data", operator_pose_server.forward_data_)) {
+                        operator_pose_server.forward_data_ = !operator_pose_server.forward_data_;
+                    }
+                    ImGui::PopStyleColor();
                 }
                 else
                 {
@@ -773,13 +787,13 @@ int main(void)
                     ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
                     ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
                     if (ImGui::DragFloat("Send rate (Hz)", &send_rate, 1.0f, 1.0f, 100.0f)) {
-                        server.send_rate_ = send_rate;
+                        operator_pose_server.send_rate_ = send_rate;
                     }
                     ImGui::PopStyleColor();
 
                     static bool pin_sent_line = false;
                     ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
-                    ImGui::RadioButton("Pin last sent data.", &pin_sent_line);
+                    ImGui::RadioButton("Pin last sent data", &pin_sent_line);
                     ImGui::PopStyleColor();
 
                 }

@@ -543,4 +543,38 @@ struct OperatorPoseMessage {
     };
 };
 
+namespace EventMessages {
+    enum class EventType {
+        LOOK_HERE,
+        EVACUATE
+    };
+
+    template<size_t N>
+    struct StringLiteral {
+        constexpr StringLiteral(const char(&str)[N]) {
+            std::copy_n(str, N, value);
+        }
+
+        char value[N];
+    };
+
+    template<typename Payload, EventType type, StringLiteral envelope>
+    struct BaseEventMessage
+    {
+        static constexpr std::string envelope() { return envelope; }
+
+        static constexpr EventType type() { return type; }
+
+        typedef Payload RawData;
+    };
+
+    struct LookHerePayload {
+        std::array<float, 3> position;
+    };
+
+    typedef BaseEventMessage<LookHerePayload, EventType::LOOK_HERE,"EVENT_LOOK_HERE"> LookHereEventMessage;
+}
+
+
+
 #endif // !message_types_h
