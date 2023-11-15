@@ -545,34 +545,55 @@ struct OperatorPoseMessage {
 
 namespace EventMessages {
     enum class EventType {
-        LOOK_HERE,
-        EVACUATE
+        PING,
+        HERE,
+        EVACUATE,
+        CLEAR_ALL
     };
 
-    template<size_t N>
-    struct StringLiteral {
-        constexpr StringLiteral(const char(&str)[N]) {
-            std::copy_n(str, N, value);
+    enum class Receiver {
+        HOLOLENS,
+        UNREAL
+    };
+
+    static constexpr std::string envelope(Receiver rcvr, EventType evt_type) {
+        std::string prefix = rcvr == Receiver::HOLOLENS ? "HL_" : "UE_";
+        std::string event = "unknown";
+
+        const size_t event_cnt = 4;
+        std::string event_codes[event_cnt] = {
+            "ping",
+            "here",
+            "evac",
+            "clr_all"
+        };
+
+        if (static_cast<size_t>(evt_type) < event_cnt) {
+            event = static_cast<size_t>(evt_type);
         }
 
-        char value[N];
+        return prefix + event;
+    }
+
+    struct PingEventMessage {
+        static constexpr EventType type() { return EventType::PING; }
     };
 
-    template<typename Payload, EventType type, StringLiteral envelope>
-    struct BaseEventMessage
-    {
-        static constexpr std::string envelope() { return envelope; }
+    struct HereEventMessage {
+        static constexpr EventType type() { return EventType::HERE; }
 
-        static constexpr EventType type() { return type; }
-
-        typedef Payload RawData;
+        struct RawData {
+            std::array<float, 3> position;
+        };
     };
 
-    struct LookHerePayload {
-        std::array<float, 3> position;
+    struct EvacuateEventMessage {
+        static constexpr EventType type() { return EventType::EVACUATE; }
     };
 
-    typedef BaseEventMessage<LookHerePayload, EventType::LOOK_HERE,"EVENT_LOOK_HERE"> LookHereEventMessage;
+    struct ClearAllEventMessage {
+        static constexpr EventType type() { return EventType::CLEAR_ALL; }
+    };
 }
 
 

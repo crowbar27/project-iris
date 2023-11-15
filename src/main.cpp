@@ -479,9 +479,11 @@ struct OperatorPoseServer
 struct EventServer {
     void start(zmq::context_t* ctx) {
         //TODO
+
+        //TODO centralize IP and ports
     }
 
-    std::vector<EventMessages::LookHereEventMessage::RawData> received_data_;
+    std::vector<std::string> received_messages_;
 };
 
 
@@ -812,6 +814,13 @@ int main(void)
                 }
                 ImGui::PopStyleColor();
                 ImGui::PopStyleColor();
+
+                ImGui::EndTabItem();
+            }
+            ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
+            if (ImGui::BeginTabItem("Events"))
+            {
+
 
                 ImGui::EndTabItem();
             }
