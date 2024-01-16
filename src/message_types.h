@@ -537,6 +537,7 @@ struct OperatorPoseMessage {
 
     struct RawData
     {
+        //TODO include some operator id?
         std::array<float, 3> position; // 3d position (x,y,z)
         std::array<float, 4> orientation; // orientation given as quaternion (w,x,y,z)
         std::array<float, 3> gaze_ray; // additional directional vector for eye gaze (x,y,z)
@@ -548,7 +549,8 @@ namespace EventMessages {
         PING,
         HERE,
         EVACUATE,
-        CLEAR_ALL
+        CLEAR_ALL,
+        SHOW_PLOT
     };
 
     enum class Receiver {
@@ -560,12 +562,13 @@ namespace EventMessages {
         std::string prefix = rcvr == Receiver::HOLOLENS ? "HL_" : "UE_";
         std::string event = "unknown";
 
-        const size_t event_cnt = 4;
+        const size_t event_cnt = 5;
         std::string event_codes[event_cnt] = {
             "ping",
             "here",
             "evac",
             "clr_all"
+            "show_plot"
         };
 
         if (static_cast<size_t>(evt_type) < event_cnt) {
@@ -593,6 +596,25 @@ namespace EventMessages {
 
     struct ClearAllEventMessage {
         static constexpr EventType type() { return EventType::CLEAR_ALL; }
+    };
+
+    struct ShowPlotEventMessage
+    {
+        static constexpr EventType type() { return EventType::SHOW_PLOT; }
+
+        struct RawData {
+            uint32_t sensor_cnt;
+            std::array<uint32_t, 12> sensor_ids;
+
+            RawData(std::initializer_list<TrussStructureMessage::SensorID> sensors_ids)
+                : sensor_cnt(std::max(static_cast<uint32_t>(sensors_ids.size()), 12u)), sensor_ids()
+            {
+                //TODO print warning if initializer list too long?
+                for (uint32_t i = 0; i < sensor_cnt; ++i) {
+                    sensor_ids[i] = static_cast<uint32_t>(*(sensors_ids.begin() + i));
+                }
+            }
+        };
     };
 }
 
