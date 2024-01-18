@@ -114,7 +114,7 @@ struct DataServer {
 
             local_data_.resize(load_buffer.size());
             for (size_t row = 0; row < load_buffer.size(); ++row) {
-                std::memcpy(&local_data_[row].data, load_buffer[row].data(), load_buffer[row].size());
+                std::memcpy(&local_data_[row].data, load_buffer[row].data(), load_buffer[row].size() * sizeof(double));
             }
         }
     }
