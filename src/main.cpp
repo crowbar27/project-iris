@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <format>
+
 #include "message_types.h"
 
 namespace TheiaColorPalette
@@ -38,8 +40,9 @@ struct DataServer {
 
         //  Prepare publisher
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-        publisher.bind("tcp://129.69.205.56:5555");
-        //publisher.bind("tcp://127.0.0.1:5555");
+
+        //publisher.bind("tcp://129.69.205.56:5555");
+        publisher.bind("tcp://127.0.0.1:5555"); // Bind to localhost for use with Unreal Engine application.
 
         // wait for subscribers to connect?
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -275,13 +278,16 @@ struct OperatorPoseServer
     {
         //  Prepare subscriber
         zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
-        subscriber.bind("tcp://129.69.205.56:5556"); // bind to own IP adress, while HoloLens will connect to this adress
+        // subscriber.bind("tcp://129.69.205.56:5556"); // Bind to own IP adress, while HoloLens will connect to this adress.
+        subscriber.bind("tcp://127.0.0.1:5556"); // Bind localhost to use locally with Unreal Engine application.
+
         //  Opens OperatorPoseMessage envelope
         subscriber.set(zmq::sockopt::subscribe, OperatorPoseMessage::envelope());
 
         // Prepare publisher for message forwarding
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-        publisher.bind("tcp://129.69.205.56:5557");
+        // publisher.bind("tcp://129.69.205.56:5557"); // Bind to own IP adress, while HoloLens will connect to this adress
+        publisher.bind("tcp://127.0.0.1:5557"); // Bind to localhost for use with Unreal Engine application.
 
         std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
 
@@ -476,15 +482,156 @@ struct OperatorPoseServer
     std::atomic<size_t> current_data_row_;
 };
 
-struct EventServer {
-    void start(zmq::context_t* ctx) {
-        //TODO
 
-        //TODO centralize IP and ports
+struct EventServer {
+
+    void start(zmq::context_t* ctx)
+    {
+        std::cout << "Started event server!" << std::endl;
+
+        //  Prepare subscriber
+        zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
+
+        // subscriber.bind("tcp://127.0.0.1:5558");
+        subscriber.bind("tcp://*:5558"); // Bind to * for use locally with Unreal Engine application.
+
+        // Subscribe to HERE event.
+        const auto event_here_envelope =
+            EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::HERE);
+        subscriber.set(zmq::sockopt::subscribe, event_here_envelope);
+
+        // Subscribe to SHOW_PLOT event.
+        const auto event_show_plot_envelope =
+            EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SHOW_PLOT);
+        subscriber.set(zmq::sockopt::subscribe, event_show_plot_envelope);
+
+        std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
+
+        auto t_0 = std::chrono::high_resolution_clock::now();
+        auto elapsed_time =
+            std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
+
+        is_running_ = true;
+
+        while (is_running_) {
+
+            elapsed_time =
+                std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            // Poll for incoming messages with 100ms timeout
+            zmq::poll(items, 100);
+
+            if (items.front().revents & ZMQ_POLLIN)
+            {
+                // Receive all parts of the message
+                std::vector<zmq::message_t> recv_msgs;
+
+                std::cout << "Received Messages Size: " << recv_msgs.size() << std::endl;
+
+                zmq::recv_result_t result =
+                    zmq::recv_multipart(subscriber, std::back_inserter(recv_msgs));
+
+                assert(result && "recv failed");
+                assert(*result == 2);
+
+                const std::string envelope_string = recv_msgs[0].to_string();
+                std::cout << "Envelope '" << envelope_string << "' message received at: " << elapsed_time << std::endl;
+
+                // HERE event envelope.
+                if (envelope_string == event_here_envelope) {
+
+                    const EventMessages::HereEventMessage::RawData MsgData =
+                        *(recv_msgs[1].data<EventMessages::HereEventMessage::RawData>());
+
+                    // Vector array values, formatted with less decimals.
+                    std::string location_string = "[" + std::format("{:.2f}", MsgData.position[0]) + ", "
+                        + std::format("{:.2f}", MsgData.position[1]) + ", "
+                        + std::format("{:.2f}", MsgData.position[2]) + "]";
+
+                    std::cout << location_string << std::endl;
+
+                    received_here_data_.push_back(*(recv_msgs[1].data<EventMessages::HereEventMessage>()));
+
+                    received_messages_.push_back({ "HERE", location_string });
+                }
+                // SHOW_PLOT event envelope.
+                else if (envelope_string == event_show_plot_envelope)
+                {
+                    const EventMessages::ShowPlotEventMessage::RawData MsgData =
+                        *(recv_msgs[1].data<EventMessages::ShowPlotEventMessage::RawData>());
+
+                    std::string sensor_string = "[";
+                    for (int i = 0; i < MsgData.sensor_cnt; ++i)
+                    {
+                        sensor_string += TrussStructureMessage::getLabel(MsgData.sensor_ids[i]);
+                        if (i < MsgData.sensor_cnt - 1)
+                        {
+                            sensor_string += ", ";
+                        }
+                        else 
+                        {
+                            sensor_string += "]";
+                        }
+                    }
+
+                    std::cout << sensor_string << std::endl;
+                    received_show_plot_data_.push_back(*(recv_msgs[1].data<EventMessages::ShowPlotEventMessage>()));
+                    received_messages_.push_back({ "SHOW_PLOT", sensor_string });
+                }
+
+            }
+        }
     }
 
-    std::vector<std::string> received_messages_;
+    void viewEventData()
+    {
+        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable |
+            ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
+            ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+        
+        if (ImGui::BeginTable("/event_data", 2, flags))
+        {
+            ImGui::TableSetupColumn("Type");
+            ImGui::TableSetupColumn("Value(s)");
+            ImGui::TableHeadersRow();
+            ImGuiListClipper clipper;
+
+            clipper.Begin(received_messages_.size());
+            while (clipper.Step()) {
+                for (auto row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
+                {
+                    ImGui::TableNextRow();
+
+                    if (row % 2 == 0) {
+                        ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(TheiaColorPalette::orange()));
+                    }
+                    else
+                    {
+                        ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg,
+                            row % 2 ? ImGui::GetColorU32(TheiaColorPalette::white(0.4f)) : ImGui::GetColorU32(TheiaColorPalette::white(0.2f))
+                        );
+                    }
+
+                    // Write to the two columns.
+                    auto& row_data = received_messages_[row];
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextWrapped(get<0>(row_data).c_str());
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextWrapped(get<1>(row_data).c_str());
+                }
+            }
+            ImGui::EndTable();
+        }
+    }
+
+    std::atomic_bool is_running_;
+    std::vector<EventMessages::HereEventMessage> received_here_data_;
+    std::vector<EventMessages::ShowPlotEventMessage> received_show_plot_data_;
+    std::vector<std::tuple<std::string, std::string>> received_messages_;
 };
+
 
 
 void customImGuiColors()
@@ -621,14 +768,21 @@ int main(void)
 
     zmq::context_t ctx;
 
+    // Servers..
     DataServer server;
     DummySubscriber dummy_subscriber;
     OperatorPoseServer operator_pose_server;
+    EventServer event_server;
 
     bool server_mode = true;
+
+    // Start servers.
     auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx);
 
     auto ops_exec = std::async(std::launch::async, &OperatorPoseServer::start, &operator_pose_server, &ctx);
+
+    auto events_exec =
+        std::async(std::launch::async, &EventServer::start, &event_server, &ctx);
 
     std::string local_truss_structure_sensor_data_filepath;
 
@@ -818,10 +972,15 @@ int main(void)
                 ImGui::EndTabItem();
             }
             ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
+
+            // Event tab.
             if (ImGui::BeginTabItem("Events"))
             {
-
-
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(255, 255, 255, 128));
+                event_server.viewEventData();
+                ImGui::PopStyleColor();
+                ImGui::PopStyleColor();
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

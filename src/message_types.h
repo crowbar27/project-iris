@@ -607,9 +607,17 @@ namespace EventMessages {
             std::array<uint32_t, 12> sensor_ids;
 
             RawData(std::initializer_list<TrussStructureMessage::SensorID> sensors_ids)
-                : sensor_cnt(std::max(static_cast<uint32_t>(sensors_ids.size()), 12u)), sensor_ids()
+                : sensor_cnt(std::min(static_cast<uint32_t>(sensors_ids.size()), 12u)), sensor_ids()
             {
                 //TODO print warning if initializer list too long?
+                for (uint32_t i = 0; i < sensor_cnt; ++i) {
+                    sensor_ids[i] = static_cast<uint32_t>(*(sensors_ids.begin() + i));
+                }
+            }
+
+            RawData(const std::vector<TrussStructureMessage::SensorID>& sensors_ids)
+                : sensor_cnt(std::min(static_cast<uint32_t>(sensors_ids.size()), 12u)), sensor_ids()
+            {
                 for (uint32_t i = 0; i < sensor_cnt; ++i) {
                     sensor_ids[i] = static_cast<uint32_t>(*(sensors_ids.begin() + i));
                 }
