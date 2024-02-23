@@ -505,6 +505,11 @@ struct EventServer {
             EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SHOW_PLOT);
         subscriber.set(zmq::sockopt::subscribe, event_show_plot_envelope);
 
+        // Subscribe to SHOW_TEXT event.
+        const auto event_show_text_envelope =
+            EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SHOW_TEXT);
+        subscriber.set(zmq::sockopt::subscribe, event_show_text_envelope);
+
         std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
 
         auto t_0 = std::chrono::high_resolution_clock::now();
@@ -546,15 +551,16 @@ struct EventServer {
                         *(recv_msgs[1].data<EventMessages::HereEventMessage::RawData>());
 
                     // Vector array values, formatted with less decimals.
-                    std::string location_string = "[" + std::format("{:.2f}", MsgData.position[0]) + ", "
+                    std::string location_string =
+                        "[" + std::format("{:.2f}", MsgData.position[0]) + ", "
                         + std::format("{:.2f}", MsgData.position[1]) + ", "
                         + std::format("{:.2f}", MsgData.position[2]) + "]";
-
-                    std::cout << location_string << std::endl;
+                    
+                    std::string message_string = "\nMsg: '" + MsgData.getMessage() + "'";
+                    std::cout << location_string << message_string << std::endl;
 
                     received_here_data_.push_back(*(recv_msgs[1].data<EventMessages::HereEventMessage>()));
-
-                    received_messages_.push_back({ "HERE", location_string });
+                    received_messages_.push_back({ "HERE", location_string + message_string});
                 }
                 // SHOW_PLOT event envelope.
                 else if (envelope_string == event_show_plot_envelope)
@@ -580,7 +586,18 @@ struct EventServer {
                     received_show_plot_data_.push_back(*(recv_msgs[1].data<EventMessages::ShowPlotEventMessage>()));
                     received_messages_.push_back({ "SHOW_PLOT", sensor_string });
                 }
+                // SHOW_TEXT event envelope.
+                else if (envelope_string == event_show_text_envelope)
+                {
+                    const EventMessages::ShowTextEventMessage::RawData MsgData =
+                        *(recv_msgs[1].data<EventMessages::ShowTextEventMessage::RawData>());
+                    
+                    std::string message = MsgData.getMessage();
 
+                    std::cout << "Message: " << message << ", Size: " << message.size() << std::endl;
+                    received_show_text_data_.push_back(*(recv_msgs[1].data<EventMessages::ShowTextEventMessage>()));
+                    received_messages_.push_back({ "SHOW_TEXT", message });
+                }
             }
         }
     }
@@ -629,9 +646,9 @@ struct EventServer {
     std::atomic_bool is_running_;
     std::vector<EventMessages::HereEventMessage> received_here_data_;
     std::vector<EventMessages::ShowPlotEventMessage> received_show_plot_data_;
+    std::vector<EventMessages::ShowTextEventMessage> received_show_text_data_;
     std::vector<std::tuple<std::string, std::string>> received_messages_;
 };
-
 
 
 void customImGuiColors()

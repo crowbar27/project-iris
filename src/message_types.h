@@ -550,7 +550,8 @@ namespace EventMessages {
         HERE,
         EVACUATE,
         CLEAR_ALL,
-        SHOW_PLOT
+        SHOW_PLOT,
+        SHOW_TEXT
     };
 
     enum class Receiver {
@@ -562,13 +563,14 @@ namespace EventMessages {
         std::string prefix = rcvr == Receiver::HOLOLENS ? "HL_" : "UE_";
         std::string event = "unknown";
 
-        const size_t event_cnt = 5;
+        const size_t event_cnt = 6;
         std::string event_codes[event_cnt] = {
             "ping",
             "here",
             "evac",
             "clr_all"
-            "show_plot"
+            "show_plot",
+            "show_text"
         };
 
         if (static_cast<size_t>(evt_type) < event_cnt) {
@@ -586,7 +588,33 @@ namespace EventMessages {
         static constexpr EventType type() { return EventType::HERE; }
 
         struct RawData {
+
             std::array<float, 3> position;
+        private:
+            static constexpr uint32_t MAX_CHAR_LENGTH = 500u;
+            uint32_t char_count = 0;
+            std::array<char, MAX_CHAR_LENGTH> message_chars{};
+
+        public:
+            RawData(const std::array<float, 3>& position)
+                : position(position)
+            {}
+
+            RawData(const std::array<float, 3>& position, const std::string& text)
+                : position(position), char_count(std::min(static_cast<uint32_t>(text.size()), MAX_CHAR_LENGTH))
+            {
+                for (uint32_t i = 0; i < char_count; ++i) {
+                    message_chars[i] = static_cast<uint32_t>(*(text.begin() + i));
+                }
+            }
+
+            // The message could be an empty string.
+            std::string getMessage() const
+            {
+                std::string Message = message_chars.data();
+                Message = Message.substr(0, char_count);
+                return Message;
+            };
         };
     };
 
@@ -622,6 +650,35 @@ namespace EventMessages {
                     sensor_ids[i] = static_cast<uint32_t>(*(sensors_ids.begin() + i));
                 }
             }
+        };
+    };
+
+    struct ShowTextEventMessage
+    {
+        static constexpr EventType type() { return EventType::SHOW_TEXT; }
+
+        struct RawData {
+
+        private:
+            static constexpr uint32_t MAX_CHAR_LENGTH = 500u;
+            uint32_t char_count;
+            std::array<char, MAX_CHAR_LENGTH> message_chars;
+
+        public:
+            RawData(const std::string& text)
+                : char_count(std::min(static_cast<uint32_t>(text.size()), MAX_CHAR_LENGTH))
+            {
+                for (uint32_t i = 0; i < char_count; ++i) {
+                    message_chars[i] = static_cast<uint32_t>(*(text.begin() + i));
+                }
+            }
+
+            std::string getMessage() const
+            {
+                std::string Message = message_chars.data();
+                Message = Message.substr(0, char_count);
+                return Message;
+            };
         };
     };
 }
