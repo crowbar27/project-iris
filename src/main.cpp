@@ -274,20 +274,17 @@ struct DummySubscriber {
 */
 struct OperatorPoseServer
 {
-    void start(zmq::context_t* ctx)
+    void start(zmq::context_t* ctx, std::string const& adress)
     {
         //  Prepare subscriber
         zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
-        // subscriber.bind("tcp://129.69.205.56:5556"); // Bind to own IP adress, while HoloLens will connect to this adress.
-        subscriber.bind("tcp://127.0.0.1:5556"); // Bind localhost to use locally with Unreal Engine application.
-
+        subscriber.bind(adress + ":5556"); // bind to own IP adress, while HoloLens will connect to this adress
         //  Opens OperatorPoseMessage envelope
         subscriber.set(zmq::sockopt::subscribe, OperatorPoseMessage::envelope());
 
         // Prepare publisher for message forwarding
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-        // publisher.bind("tcp://129.69.205.56:5557"); // Bind to own IP adress, while HoloLens will connect to this adress
-        publisher.bind("tcp://127.0.0.1:5557"); // Bind to localhost for use with Unreal Engine application.
+        publisher.bind(adress + ":5557");
 
         std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
 
@@ -783,6 +780,10 @@ int main(void)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
 
+    //TODO centralize IP and ports
+
+    std::string adress = "tcp://129.69.205.56";
+
     zmq::context_t ctx;
 
     // Servers..
@@ -796,7 +797,9 @@ int main(void)
     // Start servers.
     auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx);
 
-    auto ops_exec = std::async(std::launch::async, &OperatorPoseServer::start, &operator_pose_server, &ctx);
+    auto ops_exec = std::async(std::launch::async, &OperatorPoseServer::start, &operator_pose_server, &ctx, adress);
+
+    auto event_exec = std::async(std::launch::async, &EventServer::start, &event_server, &ctx, adress);
 
     auto events_exec =
         std::async(std::launch::async, &EventServer::start, &event_server, &ctx);
