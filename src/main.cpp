@@ -482,7 +482,7 @@ struct OperatorPoseServer
 
 struct EventServer {
 
-    void start(zmq::context_t* ctx)
+    void start(zmq::context_t* ctx, std::string const& adress)
     {
         std::cout << "Started event server!" << std::endl;
 
@@ -490,7 +490,11 @@ struct EventServer {
         zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
 
         // subscriber.bind("tcp://127.0.0.1:5558");
-        subscriber.bind("tcp://*:5558"); // Bind to * for use locally with Unreal Engine application.
+        subscriber.bind(adress + ":5558"); // Bind to * for use locally with Unreal Engine application.
+
+        // Prepare publisher for message forwarding
+        zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
+        publisher.bind(adress + ":5559");
 
         // Subscribe to HERE event.
         const auto event_here_envelope =
@@ -529,15 +533,16 @@ struct EventServer {
             {
                 // Receive all parts of the message
                 std::vector<zmq::message_t> recv_msgs;
-
-                std::cout << "Received Messages Size: " << recv_msgs.size() << std::endl;
-
-                zmq::recv_result_t result =
-                    zmq::recv_multipart(subscriber, std::back_inserter(recv_msgs));
+                zmq::recv_result_t result = zmq::recv_multipart(subscriber, std::back_inserter(recv_msgs));
 
                 assert(result && "recv failed");
                 assert(*result == 2);
 
+                // Forward events
+                publisher.send(recv_msgs[0], zmq::send_flags::sndmore);
+                publisher.send(recv_msgs[1]);
+
+                std::cout << "Received Messages Size: " << recv_msgs.size() << std::endl;
                 const std::string envelope_string = recv_msgs[0].to_string();
                 std::cout << "Envelope '" << envelope_string << "' message received at: " << elapsed_time << std::endl;
 
@@ -800,9 +805,6 @@ int main(void)
     auto ops_exec = std::async(std::launch::async, &OperatorPoseServer::start, &operator_pose_server, &ctx, adress);
 
     auto event_exec = std::async(std::launch::async, &EventServer::start, &event_server, &ctx, adress);
-
-    auto events_exec =
-        std::async(std::launch::async, &EventServer::start, &event_server, &ctx);
 
     std::string local_truss_structure_sensor_data_filepath;
 
