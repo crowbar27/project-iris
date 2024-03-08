@@ -35,14 +35,13 @@ namespace TheiaColorPalette
 }
 
 struct DataServer {
-    void startPublisher(zmq::context_t* ctx) {
+    void startPublisher(zmq::context_t* ctx, std::string const& adress) {
         // TODO simulate publishing of live data
 
         //  Prepare publisher
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
 
-        //publisher.bind("tcp://129.69.205.56:5555");
-        publisher.bind("tcp://127.0.0.1:5555"); // Bind to localhost for use with Unreal Engine application.
+        publisher.bind(adress + ":5555");
 
         // wait for subscribers to connect?
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -185,10 +184,10 @@ struct DataServer {
 struct DummySubscriber {
     // TODO simulate receiving live data
 
-    void startSubscriber(zmq::context_t* ctx) {
+    void startSubscriber(zmq::context_t* ctx, std::string const& adress) {
         //  Prepare subscriber
         zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
-        subscriber.connect("tcp://127.0.0.1:5555");
+        subscriber.connect(adress + ":5555");
 
         //  Opens "A" and "B" envelopes
         subscriber.set(zmq::sockopt::subscribe, "A");
@@ -787,7 +786,9 @@ int main(void)
 
     //TODO centralize IP and ports
 
-    std::string adress = "tcp://129.69.205.56";
+    // Bind to localhost for use with Unreal Engine application.
+    //std::string adress = "tcp://127.0.0.1";
+    std::string adress = "tcp://141.58.18.185";
 
     zmq::context_t ctx;
 
@@ -800,7 +801,7 @@ int main(void)
     bool server_mode = true;
 
     // Start servers.
-    auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx);
+    auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx, adress);
 
     auto ops_exec = std::async(std::launch::async, &OperatorPoseServer::start, &operator_pose_server, &ctx, adress);
 
