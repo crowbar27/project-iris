@@ -57,6 +57,7 @@ add_executable(project-iris "")
 
 target_sources(project-iris
     PRIVATE
+        src/config.h
         src/main.cpp
         src/message_types.h
 )

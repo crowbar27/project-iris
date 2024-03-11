@@ -21,6 +21,7 @@
 
 #include <format>
 
+#include "config.h"
 #include "message_types.h"
 
 namespace TheiaColorPalette
@@ -35,13 +36,13 @@ namespace TheiaColorPalette
 }
 
 struct DataServer {
-    void startPublisher(zmq::context_t* ctx, std::string const& adress) {
+    void startPublisher(zmq::context_t* ctx, std::string const& adress, std::string const& pub_port) {
         // TODO simulate publishing of live data
 
         //  Prepare publisher
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
 
-        publisher.bind(adress + ":5555");
+        publisher.bind(adress + pub_port);
 
         // wait for subscribers to connect?
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -184,10 +185,10 @@ struct DataServer {
 struct DummySubscriber {
     // TODO simulate receiving live data
 
-    void startSubscriber(zmq::context_t* ctx, std::string const& adress) {
+    void startSubscriber(zmq::context_t* ctx, std::string const& adress, std::string const& sub_port) {
         //  Prepare subscriber
         zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
-        subscriber.connect(adress + ":5555");
+        subscriber.connect(adress + sub_port);
 
         //  Opens "A" and "B" envelopes
         subscriber.set(zmq::sockopt::subscribe, "A");
@@ -273,17 +274,17 @@ struct DummySubscriber {
 */
 struct OperatorPoseServer
 {
-    void start(zmq::context_t* ctx, std::string const& adress)
+    void start(zmq::context_t* ctx, std::string const& adress, std::string const& sub_port, std::string const& pub_port)
     {
         //  Prepare subscriber
         zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
-        subscriber.bind(adress + ":5556"); // bind to own IP adress, while HoloLens will connect to this adress
+        subscriber.bind(adress + sub_port); // bind to own IP adress, while HoloLens will connect to this adress
         //  Opens OperatorPoseMessage envelope
         subscriber.set(zmq::sockopt::subscribe, OperatorPoseMessage::envelope());
 
         // Prepare publisher for message forwarding
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-        publisher.bind(adress + ":5557");
+        publisher.bind(adress + pub_port);
 
         std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
 
@@ -481,7 +482,7 @@ struct OperatorPoseServer
 
 struct EventServer {
 
-    void start(zmq::context_t* ctx, std::string const& adress)
+    void start(zmq::context_t* ctx, std::string const& adress, std::string const& sub_port, std::string const& pub_port)
     {
         std::cout << "Started event server!" << std::endl;
 
@@ -489,11 +490,11 @@ struct EventServer {
         zmq::socket_t subscriber(*ctx, zmq::socket_type::sub);
 
         // subscriber.bind("tcp://127.0.0.1:5558");
-        subscriber.bind(adress + ":5558"); // Bind to * for use locally with Unreal Engine application.
+        subscriber.bind(adress + sub_port); // Bind to * for use locally with Unreal Engine application.
 
         // Prepare publisher for message forwarding
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-        publisher.bind(adress + ":5559");
+        publisher.bind(adress + pub_port);
 
         // Subscribe to HERE event.
         const auto event_here_envelope =
@@ -784,12 +785,6 @@ int main(void)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
 
-    //TODO centralize IP and ports
-
-    // Bind to localhost for use with Unreal Engine application.
-    //std::string adress = "tcp://127.0.0.1";
-    std::string adress = "tcp://141.58.18.185";
-
     zmq::context_t ctx;
 
     // Servers..
@@ -801,11 +796,12 @@ int main(void)
     bool server_mode = true;
 
     // Start servers.
-    auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx, adress);
+    //auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx, adress);
+    auto a = std::async(std::launch::async, &DummySubscriber::startSubscriber, &dummy_subscriber, &ctx, iris::serverIp(), iris::sensorDataPubPort());
 
-    auto ops_exec = std::async(std::launch::async, &OperatorPoseServer::start, &operator_pose_server, &ctx, adress);
+    auto ops_exec = std::async(std::launch::async, &OperatorPoseServer::start, &operator_pose_server, &ctx, iris::serverIp(), iris::operatorPoseSubPort(), iris::operatorPosePubPort());
 
-    auto event_exec = std::async(std::launch::async, &EventServer::start, &event_server, &ctx, adress);
+    auto event_exec = std::async(std::launch::async, &EventServer::start, &event_server, &ctx, iris::serverIp(), iris::eventDataSubPort(), iris::eventDataPubPort());
 
     std::string local_truss_structure_sensor_data_filepath;
 
