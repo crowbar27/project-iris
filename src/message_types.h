@@ -260,8 +260,8 @@ struct TrussStructureMessage {
         CAM_32_4_NO_Y
     };
 
-    static constexpr std::string getLabel(size_t id) {
-        std::string sensor_labels[sensor_cnt] = {
+    static std::string getLabel(size_t id) {
+        static const auto sensor_labels = std::to_array<std::string>({
         "mod_1_numvars",
         "mod_1_timestamp",
         "mod_1_elong_1",
@@ -506,12 +506,12 @@ struct TrussStructureMessage {
         "cam_30_4_nw_y",
         "cam_31_4_no_z",
         "cam_32_4_no_y"
-        };
+        });
 
         return sensor_labels[id];
     }
 
-    static constexpr std::string getLabel(SensorID id) {
+    static std::string getLabel(SensorID id) {
         return getLabel(static_cast<size_t>(id));
     }
 
