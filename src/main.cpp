@@ -796,8 +796,8 @@ int main(void)
     bool server_mode = true;
 
     // Start servers.
-    //auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx, adress);
-    auto a = std::async(std::launch::async, &DummySubscriber::startSubscriber, &dummy_subscriber, &ctx, iris::serverIp(), iris::sensorDataPubPort());
+    auto a = std::async(std::launch::async, &DataServer::startPublisher, &server, &ctx, iris::serverIp(), iris::sensorDataPubPort());
+    //auto a = std::async(std::launch::async, &DummySubscriber::startSubscriber, &dummy_subscriber, &ctx, iris::serverIp(), iris::sensorDataPubPort());
 
     auto ops_exec = std::async(std::launch::async, &OperatorPoseServer::start, &operator_pose_server, &ctx, iris::serverIp(), iris::operatorPoseSubPort(), iris::operatorPosePubPort());
 
