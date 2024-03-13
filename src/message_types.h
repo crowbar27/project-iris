@@ -617,6 +617,10 @@ namespace EventMessages {
                 return Message;
             };
         };
+
+        RawData data;
+
+        HereEventMessage(RawData data) : data(data) {}
     };
 
     struct EvacuateEventMessage {
