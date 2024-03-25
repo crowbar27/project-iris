@@ -524,6 +524,14 @@ struct TrussStructureMessage {
 
 };
 
+enum class HoloLensOperator : uint32_t {
+    OPERATOR_0    = 0,
+    OPERATOR_1    = 1,
+    OPERATOR_2    = 2,
+    OPERATOR_3    = 3,
+    ALL_OPERATORS = 9999
+};
+
 /**
 * Message type for communicatong the pose (position + orientation)
 * and eye gaze ray of a (human) operator in the MR scene.
@@ -538,7 +546,7 @@ struct OperatorPoseMessage {
 
     struct RawData
     {
-        //TODO include some operator id?
+        HoloLensOperator     operator_id;
         std::array<float, 3> position; // 3d position (x,y,z)
         std::array<float, 4> orientation; // orientation given as quaternion (w,x,y,z)
         std::array<float, 3> gaze_ray; // additional directional vector for eye gaze (x,y,z)
@@ -552,7 +560,9 @@ namespace EventMessages {
         EVACUATE,
         CLEAR_ALL,
         SHOW_PLOT,
-        SHOW_TEXT
+        SHOW_TEXT,
+        REQUEST_RESPONSE,
+        SEND_RESPONSE
     };
 
     enum class Receiver {
@@ -564,14 +574,16 @@ namespace EventMessages {
         std::string prefix = rcvr == Receiver::HOLOLENS ? "HL_" : "UE_";
         std::string event = "unknown";
 
-        const size_t event_cnt = 6;
+        const size_t event_cnt = 8;
         std::string event_codes[event_cnt] = {
             "ping",
             "here",
             "evac",
             "clr_all"
             "show_plot",
-            "show_text"
+            "show_text",
+            "request_response",
+            "send_response"
         };
 
         if (static_cast<size_t>(evt_type) < event_cnt) {
@@ -581,111 +593,158 @@ namespace EventMessages {
         return prefix + event;
     }
 
-    struct PingEventMessage {
-        static constexpr EventType type() { return EventType::PING; }
+    template <typename RAWDATA, EventType MESSAGE_TYPE>
+    struct BaseEventMessage {
+        constexpr EventType type() const {
+            return MESSAGE_TYPE;
+        }
+
+        RAWDATA data;
+
+        BaseEventMessage(RAWDATA data) : data(data) {}
     };
 
-    struct HereEventMessage {
-        static constexpr EventType type() { return EventType::HERE; }
+    struct PingEventRawData {
+        HoloLensOperator operator_id;
+    };
+    struct PingEventMessage : public BaseEventMessage<PingEventRawData, EventType::PING>{};
 
-        struct RawData {
 
-            std::array<float, 3> position;
-        private:
-            static constexpr uint32_t MAX_CHAR_LENGTH = 500u;
-            uint32_t char_count = 0;
-            std::array<char, MAX_CHAR_LENGTH> message_chars{};
+    struct HereEventRawData {
+        HoloLensOperator     operator_id;
+        std::array<float, 3> position;
+    private:
+        static constexpr uint32_t MAX_CHAR_LENGTH = 500u;
+        uint32_t char_count = 0;
+        std::array<char, MAX_CHAR_LENGTH> message_chars{};
 
-        public:
-            RawData(const std::array<float, 3>& position)
-                : position(position)
-            {}
+    public:
+        HereEventRawData(const std::array<float, 3>& position)
+            : position(position)
+        {}
 
-            RawData(const std::array<float, 3>& position, const std::string& text)
-                : position(position), char_count(std::min(static_cast<uint32_t>(text.size()), MAX_CHAR_LENGTH))
-            {
-                for (uint32_t i = 0; i < char_count; ++i) {
-                    message_chars[i] = static_cast<uint32_t>(*(text.begin() + i));
-                }
+        HereEventRawData(const std::array<float, 3>& position, const std::string& text)
+            : position(position), char_count(std::min(static_cast<uint32_t>(text.size()), MAX_CHAR_LENGTH))
+        {
+            for (uint32_t i = 0; i < char_count; ++i) {
+                message_chars[i] = static_cast<uint32_t>(*(text.begin() + i));
             }
+        }
 
-            // The message could be an empty string.
-            std::string getMessage() const
-            {
-                std::string Message = message_chars.data();
-                Message = Message.substr(0, char_count);
-                return Message;
-            };
+        // The message could be an empty string.
+        std::string getMessage() const
+        {
+            std::string Message = message_chars.data();
+            Message = Message.substr(0, char_count);
+            return Message;
         };
-
-        RawData data;
-
-        HereEventMessage(RawData data) : data(data) {}
     };
 
-    struct EvacuateEventMessage {
-        static constexpr EventType type() { return EventType::EVACUATE; }
+    struct HereEventMessage : public BaseEventMessage<HereEventRawData, EventType::HERE> {
+        HereEventMessage(HereEventRawData data) : BaseEventMessage(data) {}
     };
 
-    struct ClearAllEventMessage {
-        static constexpr EventType type() { return EventType::CLEAR_ALL; }
-    };
 
-    struct ShowPlotEventMessage
+    struct EvacuateEventRawData
     {
-        static constexpr EventType type() { return EventType::SHOW_PLOT; }
-
-        struct RawData {
-            uint32_t sensor_cnt;
-            std::array<uint32_t, 12> sensor_ids;
-
-            RawData(std::initializer_list<TrussStructureMessage::SensorID> sensors_ids)
-                : sensor_cnt(std::min(static_cast<uint32_t>(sensors_ids.size()), 12u)), sensor_ids()
-            {
-                //TODO print warning if initializer list too long?
-                for (uint32_t i = 0; i < sensor_cnt; ++i) {
-                    sensor_ids[i] = static_cast<uint32_t>(*(sensors_ids.begin() + i));
-                }
-            }
-
-            RawData(const std::vector<TrussStructureMessage::SensorID>& sensors_ids)
-                : sensor_cnt(std::min(static_cast<uint32_t>(sensors_ids.size()), 12u)), sensor_ids()
-            {
-                for (uint32_t i = 0; i < sensor_cnt; ++i) {
-                    sensor_ids[i] = static_cast<uint32_t>(*(sensors_ids.begin() + i));
-                }
-            }
-        };
+        HoloLensOperator operator_id;
     };
+    struct EvacuateEventMessage : public BaseEventMessage<EvacuateEventRawData, EventType::EVACUATE> {};
 
-    struct ShowTextEventMessage
+
+    struct ClearAllEventRawData
     {
-        static constexpr EventType type() { return EventType::SHOW_TEXT; }
+        HoloLensOperator operator_id;
+    };
+    struct ClearAllEventMessage : public BaseEventMessage<ClearAllEventRawData, EventType::CLEAR_ALL> {};
 
-        struct RawData {
 
-        private:
-            static constexpr uint32_t MAX_CHAR_LENGTH = 500u;
-            uint32_t char_count;
-            std::array<char, MAX_CHAR_LENGTH> message_chars;
+    struct ShowPlotEventRawData {
+        HoloLensOperator         operator_id;
+        uint32_t                 sensor_cnt;
+        std::array<uint32_t, 12> sensor_ids;
 
-        public:
-            RawData(const std::string& text)
-                : char_count(std::min(static_cast<uint32_t>(text.size()), MAX_CHAR_LENGTH))
-            {
-                for (uint32_t i = 0; i < char_count; ++i) {
-                    message_chars[i] = static_cast<uint32_t>(*(text.begin() + i));
-                }
+        ShowPlotEventRawData(std::initializer_list<TrussStructureMessage::SensorID> sensors_ids)
+            : sensor_cnt(std::min(static_cast<uint32_t>(sensors_ids.size()), 12u)), sensor_ids()
+        {
+            //TODO print warning if initializer list too long?
+            for (uint32_t i = 0; i < sensor_cnt; ++i) {
+                sensor_ids[i] = static_cast<uint32_t>(*(sensors_ids.begin() + i));
             }
+        }
 
-            std::string getMessage() const
-            {
-                std::string Message = message_chars.data();
-                Message = Message.substr(0, char_count);
-                return Message;
-            };
+        ShowPlotEventRawData(const std::vector<TrussStructureMessage::SensorID>& sensors_ids)
+            : sensor_cnt(std::min(static_cast<uint32_t>(sensors_ids.size()), 12u)), sensor_ids()
+        {
+            for (uint32_t i = 0; i < sensor_cnt; ++i) {
+                sensor_ids[i] = static_cast<uint32_t>(*(sensors_ids.begin() + i));
+            }
+        }
+    };
+
+    struct ShowPlotEventMessage : public BaseEventMessage<ShowPlotEventRawData, EventType::SHOW_PLOT> {};
+
+
+    struct ShowTextEventRawData {
+        HoloLensOperator operator_id;
+
+    private:
+        static constexpr uint32_t MAX_CHAR_LENGTH = 500u;
+        uint32_t char_count;
+        std::array<char, MAX_CHAR_LENGTH> message_chars;
+
+    public:
+        ShowTextEventRawData(const std::string& text)
+            : char_count(std::min(static_cast<uint32_t>(text.size()), MAX_CHAR_LENGTH))
+        {
+            for (uint32_t i = 0; i < char_count; ++i) {
+                message_chars[i] = static_cast<uint32_t>(*(text.begin() + i));
+            }
+        }
+
+        std::string getMessage() const
+        {
+            std::string Message = message_chars.data();
+            Message = Message.substr(0, char_count);
+            return Message;
         };
     };
+
+    struct ShowTextEventMessage : public BaseEventMessage<ShowTextEventRawData, EventType::SHOW_TEXT> {};
+
+
+    enum class ResponseType {
+        CONTINUE = 0
+    };
+
+    struct ResponseEventRawData {
+        HoloLensOperator operator_id;
+        ResponseType     response_type;
+    private:
+        static constexpr uint32_t MAX_CHAR_LENGTH = 500u;
+        uint32_t char_count;
+        std::array<char, MAX_CHAR_LENGTH> message_chars;
+
+    public:
+        ResponseEventRawData(const std::string& text)
+            : char_count(std::min(static_cast<uint32_t>(text.size()), MAX_CHAR_LENGTH))
+        {
+            for (uint32_t i = 0; i < char_count; ++i) {
+                message_chars[i] = static_cast<uint32_t>(*(text.begin() + i));
+            }
+        }
+
+        std::string getMessage() const
+        {
+            std::string Message = message_chars.data();
+            Message = Message.substr(0, char_count);
+            return Message;
+        };
+    };
+
+    struct RequestResponseEventMessage : public BaseEventMessage<ResponseEventRawData, EventType::REQUEST_RESPONSE> {};
+
+    struct SendResponseEventMessage : public BaseEventMessage<ResponseEventRawData, EventType::SEND_RESPONSE> {};
 }
 
 

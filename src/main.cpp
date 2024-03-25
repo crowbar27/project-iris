@@ -549,8 +549,8 @@ struct EventServer {
                 // HERE event envelope.
                 if (envelope_string == event_here_envelope) {
 
-                    const EventMessages::HereEventMessage::RawData MsgData =
-                        *(recv_msgs[1].data<EventMessages::HereEventMessage::RawData>());
+                    const EventMessages::HereEventRawData MsgData =
+                        *(recv_msgs[1].data<EventMessages::HereEventRawData>());
 
                     // Vector array values, formatted with less decimals.
                     std::string location_string =
@@ -567,8 +567,8 @@ struct EventServer {
                 // SHOW_PLOT event envelope.
                 else if (envelope_string == event_show_plot_envelope)
                 {
-                    const EventMessages::ShowPlotEventMessage::RawData MsgData =
-                        *(recv_msgs[1].data<EventMessages::ShowPlotEventMessage::RawData>());
+                    const EventMessages::ShowPlotEventRawData MsgData =
+                        *(recv_msgs[1].data<EventMessages::ShowPlotEventRawData>());
 
                     std::string sensor_string = "[";
                     for (int i = 0; i < MsgData.sensor_cnt; ++i)
@@ -591,8 +591,8 @@ struct EventServer {
                 // SHOW_TEXT event envelope.
                 else if (envelope_string == event_show_text_envelope)
                 {
-                    const EventMessages::ShowTextEventMessage::RawData MsgData =
-                        *(recv_msgs[1].data<EventMessages::ShowTextEventMessage::RawData>());
+                    const EventMessages::ShowTextEventRawData MsgData =
+                        *(recv_msgs[1].data<EventMessages::ShowTextEventRawData>());
                     
                     std::string message = MsgData.getMessage();
 
