@@ -558,7 +558,7 @@ struct EventServer {
                         + std::format("{:.2f}", MsgData.position[1]) + ", "
                         + std::format("{:.2f}", MsgData.position[2]) + "]";
                     
-                    std::string message_string = "\nMsg: '" + MsgData.getMessage() + "'";
+                    std::string message_string = "\nMsg: '" + MsgData.message.getMessage() + "'";
                     std::cout << location_string << message_string << std::endl;
 
                     received_here_data_.push_back(*(recv_msgs[1].data<EventMessages::HereEventMessage>()));
@@ -594,7 +594,7 @@ struct EventServer {
                     const EventMessages::ShowTextEventRawData MsgData =
                         *(recv_msgs[1].data<EventMessages::ShowTextEventRawData>());
                     
-                    std::string message = MsgData.getMessage();
+                    std::string message = MsgData.message.getMessage();
 
                     std::cout << "Message: " << message << ", Size: " << message.size() << std::endl;
                     received_show_text_data_.push_back(*(recv_msgs[1].data<EventMessages::ShowTextEventMessage>()));
