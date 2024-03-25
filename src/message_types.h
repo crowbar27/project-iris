@@ -678,20 +678,6 @@ namespace EventMessages {
         {}
     };
 
-
-    using PingEventMessage = BaseEventMessage<OperatorIdRawData, EventType::PING>;
-
-    using HereEventMessage = BaseEventMessage<HereEventRawData, EventType::HERE>;
-
-    using EvacuateEventMessage = BaseEventMessage<OperatorIdRawData, EventType::EVACUATE>;
-
-    using ClearAllEventMessage = BaseEventMessage<OperatorIdRawData, EventType::CLEAR_ALL>;
-
-    using ShowPlotEventMessage = BaseEventMessage<ShowPlotEventRawData, EventType::SHOW_PLOT>;
-
-    using ShowTextEventMessage = BaseEventMessage<ShowTextEventRawData, EventType::SHOW_TEXT>;
-
-
     enum class ResponseType {
         CONTINUE = 0
     };
@@ -705,6 +691,19 @@ namespace EventMessages {
             : operator_id(operator_id), response_type(response_type), message("")
         {}
     };
+
+
+    using PingEventMessage = BaseEventMessage<OperatorIdRawData, EventType::PING>;
+
+    using HereEventMessage = BaseEventMessage<HereEventRawData, EventType::HERE>;
+
+    using EvacuateEventMessage = BaseEventMessage<OperatorIdRawData, EventType::EVACUATE>;
+
+    using ClearAllEventMessage = BaseEventMessage<OperatorIdRawData, EventType::CLEAR_ALL>;
+
+    using ShowPlotEventMessage = BaseEventMessage<ShowPlotEventRawData, EventType::SHOW_PLOT>;
+
+    using ShowTextEventMessage = BaseEventMessage<ShowTextEventRawData, EventType::SHOW_TEXT>;
 
     using RequestResponseEventMessage = BaseEventMessage<ResponseEventRawData, EventType::REQUEST_RESPONSE>;
 
