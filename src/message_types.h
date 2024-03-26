@@ -635,12 +635,11 @@ namespace EventMessages {
         std::array<float, 3> position;
         TextRawData          message;
 
-    public:
         HereEventRawData(const std::array<float, 3>& position, HoloLensOperatorID receiver = HoloLensOperatorID::ALL_OPERATORS)
             : receiver(receiver), position(position), message("")
         {}
 
-        HereEventRawData(const std::array<float, 3>& position, const std::string& message, HoloLensOperatorID operator_id = HoloLensOperatorID::ALL_OPERATORS)
+        HereEventRawData(const std::array<float, 3>& position, const std::string& message, HoloLensOperatorID receiver = HoloLensOperatorID::ALL_OPERATORS)
             : receiver(receiver), position(position), message(message)
         {}
     };
@@ -672,8 +671,7 @@ namespace EventMessages {
         HoloLensOperatorID   receiver;
         TextRawData          message;
 
-    public:
-        ShowTextEventRawData(const std::string& message, HoloLensOperatorID operator_id = HoloLensOperatorID::ALL_OPERATORS)
+        ShowTextEventRawData(const std::string& message, HoloLensOperatorID receiver = HoloLensOperatorID::ALL_OPERATORS)
             : receiver(receiver), message(message)
         {}
     };
