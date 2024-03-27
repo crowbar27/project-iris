@@ -652,6 +652,24 @@ struct EventServer {
                 else if (envelope_string == event_request_response_envelope)
                 {
                     std::cout << "Received a REQUEST_RESPONSE event." << std::endl;
+
+                    const EventMessages::ResponseEventRawData MsgData =
+                        *(recv_msgs[1].data<EventMessages::ResponseEventRawData>());
+
+                    std::string message = MsgData.message.getMessage();
+                
+                    std::cout << "Receiving Operator Number: " << static_cast<uint32_t>(MsgData.operator_id) << std::endl;
+                    std::cout << "Message: " << message << ", Size: " << message.size() << std::endl;
+                    std::cout << "Response Type: " << static_cast<uint32_t>(MsgData.response_type) << std::endl;
+
+                    received_show_text_data_.push_back(*(recv_msgs[1].data<EventMessages::ShowTextEventMessage>()));
+
+                    std::string message_text =
+                        "Operator ID: " + std::to_string(static_cast<uint8_t>(MsgData.operator_id)) +
+                        "\nResponse Type ID: " + std::to_string(static_cast<uint8_t>(MsgData.response_type)) +
+                        "\nMessage: " + message;
+
+                    received_messages_.push_back({ envelope_string, message_text });
                 }
 
                 // Forward events

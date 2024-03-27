@@ -686,11 +686,11 @@ namespace EventMessages {
         ResponseType       response_type;
         TextRawData        message;
 
-        ResponseEventRawData(ResponseType response_type, HoloLensOperatorID operator_id = HoloLensOperatorID::ALL_OPERATORS)
-            : operator_id(operator_id), response_type(response_type), message("")
+        ResponseEventRawData(ResponseType response_type,
+            const std::string& message = "", HoloLensOperatorID operator_id = HoloLensOperatorID::ALL_OPERATORS)
+            : operator_id(operator_id), response_type(response_type), message(message)
         {}
     };
-
 
     using PingEventMessage = BaseEventMessage<OperatorIdRawData, EventType::PING>;
 
