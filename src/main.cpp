@@ -419,8 +419,22 @@ struct OperatorPoseServer
         std::vector<std::vector<float>> write_buffer;
 
         for (size_t row = 0; row < received_data_.size(); ++row) {
-            write_buffer.push_back(std::vector<float>(10));
-            std::memcpy(write_buffer[row].data(), &received_data_[row], sizeof(OperatorPoseMessage::RawData));
+            write_buffer.push_back(
+                std::vector<float>{
+                    static_cast<float>(received_data_[row].operator_id),
+                    received_data_[row].position[0],
+                    received_data_[row].position[1],
+                    received_data_[row].position[2],
+                    received_data_[row].orientation[0],
+                    received_data_[row].orientation[1],
+                    received_data_[row].orientation[2],
+                    received_data_[row].orientation[3],
+                    received_data_[row].gaze_ray[0],
+                    received_data_[row].gaze_ray[1],
+                    received_data_[row].gaze_ray[2]
+            });
+            //write_buffer.push_back(std::vector<float>(10));
+            //std::memcpy(write_buffer[row].data(), &received_data_[row], sizeof(OperatorPoseMessage::RawData));
         }
 
         file.createDataSet("op_pose/data", write_buffer);
@@ -444,7 +458,11 @@ struct OperatorPoseServer
 
             local_data_.resize(load_buffer.size());
             for (size_t row = 0; row < load_buffer.size(); ++row) {
-                std::memcpy(&local_data_[row], load_buffer[row].data(), load_buffer[row].size() * sizeof(float));
+                local_data_[row].operator_id = static_cast<HoloLensOperatorID>(load_buffer[row].data()[0]);
+                local_data_[row].position = { load_buffer[row].data()[1],load_buffer[row].data()[2],load_buffer[row].data()[3] };
+                local_data_[row].orientation = { load_buffer[row].data()[4],load_buffer[row].data()[5],load_buffer[row].data()[6], load_buffer[row].data()[7] };
+                local_data_[row].gaze_ray = { load_buffer[row].data()[8],load_buffer[row].data()[9],load_buffer[row].data()[10] };
+                //std::memcpy(&local_data_[row], load_buffer[row].data(), load_buffer[row].size() * sizeof(float));
             }
         }
     }
