@@ -496,6 +496,25 @@ struct EventServer {
         zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
         publisher.bind(adress + pub_port);
 
+        // Subscribe to the OperatorIdRawData events.
+
+        const auto event_clear_all_envelope =
+            EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::CLEAR_ALL);
+        subscriber.set(zmq::sockopt::subscribe, event_clear_all_envelope);
+
+        const auto event_evacuate_envelope =
+            EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::EVACUATE);
+        subscriber.set(zmq::sockopt::subscribe, event_evacuate_envelope);
+
+        const auto event_ping_envelope =
+            EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::PING);
+        subscriber.set(zmq::sockopt::subscribe, event_ping_envelope);
+
+        // Subscribe to the REQUEST_RESPONSE ResponseEventRawData event.
+        const auto event_request_response_envelope =
+            EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::REQUEST_RESPONSE);
+        subscriber.set(zmq::sockopt::subscribe, event_request_response_envelope);
+
         // Subscribe to HERE event.
         const auto event_here_envelope =
             EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::HERE);
@@ -538,16 +557,14 @@ struct EventServer {
                 assert(result && "recv failed");
                 assert(*result == 2);
 
-                // Forward events
-                publisher.send(recv_msgs[0], zmq::send_flags::sndmore);
-                publisher.send(recv_msgs[1]);
-
                 std::cout << "Received Messages Size: " << recv_msgs.size() << std::endl;
                 const std::string envelope_string = recv_msgs[0].to_string();
                 std::cout << "Envelope '" << envelope_string << "' message received at: " << elapsed_time << std::endl;
 
                 // HERE event envelope.
                 if (envelope_string == event_here_envelope) {
+
+                    std::cout << "Received a HERE event." << std::endl;
 
                     const EventMessages::HereEventRawData MsgData =
                         *(recv_msgs[1].data<EventMessages::HereEventRawData>());
@@ -561,12 +578,17 @@ struct EventServer {
                     std::string message_string = "\nMsg: '" + MsgData.message.getMessage() + "'";
                     std::cout << location_string << message_string << std::endl;
 
+                    // Print the receiver enum value.
+                    std::cout << "Receiving Operator Number: " << static_cast<uint32_t>(MsgData.receiver) << std::endl;
+
                     received_here_data_.push_back(*(recv_msgs[1].data<EventMessages::HereEventMessage>()));
-                    received_messages_.push_back({ "HERE", location_string + message_string});
+                    received_messages_.push_back({ envelope_string, location_string + message_string});
                 }
                 // SHOW_PLOT event envelope.
                 else if (envelope_string == event_show_plot_envelope)
                 {
+                    std::cout << "Received a SHOW_PLOT event." << std::endl;
+
                     const EventMessages::ShowPlotEventRawData MsgData =
                         *(recv_msgs[1].data<EventMessages::ShowPlotEventRawData>());
 
@@ -584,22 +606,57 @@ struct EventServer {
                         }
                     }
 
+                    // Print data as well as the receiving operator.
                     std::cout << sensor_string << std::endl;
+                    std::cout << "Receiving Operator Number: " << static_cast<uint32_t>(MsgData.receiver) << std::endl;
+
                     received_show_plot_data_.push_back(*(recv_msgs[1].data<EventMessages::ShowPlotEventMessage>()));
-                    received_messages_.push_back({ "SHOW_PLOT", sensor_string });
+                    received_messages_.push_back({ envelope_string, sensor_string });
                 }
                 // SHOW_TEXT event envelope.
                 else if (envelope_string == event_show_text_envelope)
                 {
+                    std::cout << "Received a SHOW_TEXT event." << std::endl;
+
                     const EventMessages::ShowTextEventRawData MsgData =
                         *(recv_msgs[1].data<EventMessages::ShowTextEventRawData>());
                     
                     std::string message = MsgData.message.getMessage();
 
                     std::cout << "Message: " << message << ", Size: " << message.size() << std::endl;
+
+                    std::cout << "Receiving Operator Number: " << static_cast<uint32_t>(MsgData.receiver) << std::endl;
+
                     received_show_text_data_.push_back(*(recv_msgs[1].data<EventMessages::ShowTextEventMessage>()));
-                    received_messages_.push_back({ "SHOW_TEXT", message });
+                    received_messages_.push_back({ envelope_string, message });
                 }
+                // Any OperatorIdRawData event envelope.
+                else if (
+                    envelope_string == event_clear_all_envelope ||
+                    envelope_string == event_evacuate_envelope ||
+                    envelope_string == event_ping_envelope
+                )
+                {
+                    std::cout << "Received a OperatorID (" << envelope_string <<  ") event." << std::endl;
+
+                    const EventMessages::OperatorIdRawData MsgData =
+                        *(recv_msgs[1].data<EventMessages::OperatorIdRawData>());
+
+                    uint32_t operator_id_number = static_cast<uint32_t>(MsgData.operator_id);
+                    std::cout << "Receiving Operator Number: " << operator_id_number << std::endl;
+
+                    received_show_text_data_.push_back(*(recv_msgs[1].data<EventMessages::ShowTextEventMessage>()));
+                    received_messages_.push_back({ envelope_string, "Operator ID: " + std::to_string(operator_id_number)});
+                }
+                // REQUEST_RESPONSE event envelope.
+                else if (envelope_string == event_request_response_envelope)
+                {
+                    std::cout << "Received a REQUEST_RESPONSE event." << std::endl;
+                }
+
+                // Forward events
+                publisher.send(recv_msgs[0], zmq::send_flags::sndmore);
+                publisher.send(recv_msgs[1]);
             }
         }
     }
@@ -612,7 +669,7 @@ struct EventServer {
         
         if (ImGui::BeginTable("/event_data", 2, flags))
         {
-            ImGui::TableSetupColumn("Type");
+            ImGui::TableSetupColumn("Envelope");
             ImGui::TableSetupColumn("Value(s)");
             ImGui::TableHeadersRow();
             ImGuiListClipper clipper;

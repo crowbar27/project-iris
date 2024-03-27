@@ -524,12 +524,12 @@ struct TrussStructureMessage {
 
 };
 
-enum class HoloLensOperatorID : uint32_t {
+enum class HoloLensOperatorID : uint8_t {
     OPERATOR_0    = 0,
     OPERATOR_1    = 1,
     OPERATOR_2    = 2,
     OPERATOR_3    = 3,
-    ALL_OPERATORS = 9999
+    ALL_OPERATORS = 255
 };
 
 /**
@@ -579,15 +579,16 @@ namespace EventMessages {
             "ping",
             "here",
             "evac",
-            "clr_all"
+            "clr_all",
             "show_plot",
             "show_text",
             "request_response",
             "send_response"
         };
 
-        if (static_cast<size_t>(evt_type) < event_cnt) {
-            event = static_cast<size_t>(evt_type);
+        const size_t index = static_cast<size_t>(evt_type);
+        if (index < event_cnt) {
+            event = event_codes[index];
         }
 
         return prefix + event;
