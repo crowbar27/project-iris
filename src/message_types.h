@@ -677,7 +677,7 @@ namespace EventMessages {
         {}
     };
 
-    enum class ResponseType {
+    enum class ResponseType : uint8_t {
         CONTINUE = 0
     };
 

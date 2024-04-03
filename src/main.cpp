@@ -18,6 +18,7 @@
 #include <future>
 #include <stdlib.h>
 #include <stdio.h>
+#include <queue>
 
 #include <format>
 
@@ -296,7 +297,7 @@ struct OperatorPoseServer
         is_running_ = true;
         while (is_running_) {
 
-            if(use_local_data_ && forward_data_ && !local_data_.empty())
+            if (use_local_data_ && forward_data_ && !local_data_.empty())
             {
                 while (elapsed_time + (1.0 / send_rate_) < std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count()) {
                     publisher.send(zmq::message_t(OperatorPoseMessage::envelope().data(), OperatorPoseMessage::envelope().size()), zmq::send_flags::sndmore);
@@ -371,7 +372,7 @@ struct OperatorPoseServer
 
                         for (int col = 0; col < 10; ++col) {
                             if (row == current_data_row_) {
-                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(TheiaColorPalette::orange()),col);
+                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(TheiaColorPalette::orange()), col);
                             }
                             else
                             {
@@ -421,7 +422,7 @@ struct OperatorPoseServer
         for (size_t row = 0; row < received_data_.size(); ++row) {
             write_buffer.push_back(
                 std::vector<float>{
-                    static_cast<float>(received_data_[row].operator_id),
+                static_cast<float>(received_data_[row].operator_id),
                     received_data_[row].position[0],
                     received_data_[row].position[1],
                     received_data_[row].position[2],
@@ -592,7 +593,7 @@ struct EventServer {
                         "[" + std::format("{:.2f}", MsgData.position[0]) + ", "
                         + std::format("{:.2f}", MsgData.position[1]) + ", "
                         + std::format("{:.2f}", MsgData.position[2]) + "]";
-                    
+
                     std::string message_string = "\nMsg: '" + MsgData.message.getMessage() + "'";
                     std::cout << location_string << message_string << std::endl;
 
@@ -600,7 +601,7 @@ struct EventServer {
                     std::cout << "Receiving Operator Number: " << static_cast<uint32_t>(MsgData.receiver) << std::endl;
 
                     received_here_data_.push_back(*(recv_msgs[1].data<EventMessages::HereEventMessage>()));
-                    received_messages_.push_back({ envelope_string, location_string + message_string});
+                    received_messages_.push_back({ envelope_string, location_string + message_string });
                 }
                 // SHOW_PLOT event envelope.
                 else if (envelope_string == event_show_plot_envelope)
@@ -618,7 +619,7 @@ struct EventServer {
                         {
                             sensor_string += ", ";
                         }
-                        else 
+                        else
                         {
                             sensor_string += "]";
                         }
@@ -638,7 +639,7 @@ struct EventServer {
 
                     const EventMessages::ShowTextEventRawData MsgData =
                         *(recv_msgs[1].data<EventMessages::ShowTextEventRawData>());
-                    
+
                     std::string message = MsgData.message.getMessage();
 
                     std::cout << "Message: " << message << ", Size: " << message.size() << std::endl;
@@ -653,9 +654,9 @@ struct EventServer {
                     envelope_string == event_clear_all_envelope ||
                     envelope_string == event_evacuate_envelope ||
                     envelope_string == event_ping_envelope
-                )
+                    )
                 {
-                    std::cout << "Received a OperatorID (" << envelope_string <<  ") event." << std::endl;
+                    std::cout << "Received a OperatorID (" << envelope_string << ") event." << std::endl;
 
                     const EventMessages::OperatorIdRawData MsgData =
                         *(recv_msgs[1].data<EventMessages::OperatorIdRawData>());
@@ -664,7 +665,7 @@ struct EventServer {
                     std::cout << "Receiving Operator Number: " << operator_id_number << std::endl;
 
                     received_show_text_data_.push_back(*(recv_msgs[1].data<EventMessages::ShowTextEventMessage>()));
-                    received_messages_.push_back({ envelope_string, "Operator ID: " + std::to_string(operator_id_number)});
+                    received_messages_.push_back({ envelope_string, "Operator ID: " + std::to_string(operator_id_number) });
                 }
                 // REQUEST_RESPONSE event envelope.
                 else if (envelope_string == event_request_response_envelope)
@@ -675,7 +676,7 @@ struct EventServer {
                         *(recv_msgs[1].data<EventMessages::ResponseEventRawData>());
 
                     std::string message = MsgData.message.getMessage();
-                
+
                     std::cout << "Receiving Operator Number: " << static_cast<uint32_t>(MsgData.operator_id) << std::endl;
                     std::cout << "Message: " << message << ", Size: " << message.size() << std::endl;
                     std::cout << "Response Type: " << static_cast<uint32_t>(MsgData.response_type) << std::endl;
@@ -693,6 +694,29 @@ struct EventServer {
                 // Forward events
                 publisher.send(recv_msgs[0], zmq::send_flags::sndmore);
                 publisher.send(recv_msgs[1]);
+
+                // Send message from queue (basically a debug feature to spawn messages from the server)
+                while (!send_message_queue_.empty())
+                {
+                    auto const& msg = send_message_queue_.front();
+
+                    switch (msg.first)
+                    {
+                    case EventMessages::EventType::SEND_RESPONSE:
+                        publisher.send(zmq::message_t(
+                            EventMessages::envelope(EventMessages::Receiver::UNREAL, EventMessages::EventType::SEND_RESPONSE).data(),
+                            EventMessages::envelope(EventMessages::Receiver::UNREAL, EventMessages::EventType::SEND_RESPONSE).size()),
+                            zmq::send_flags::sndmore
+                        );
+                        publisher.send(zmq::message_t(msg.second.get(), sizeof(EventMessages::ResponseEventRawData)));
+                        break;
+                        //TODO cover all (relevant) cases
+                    default:
+                        break;
+                    }
+
+                    //TODO add inserted message to UI display?
+                }
             }
         }
     }
@@ -702,7 +726,7 @@ struct EventServer {
         ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable |
             ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
             ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
-        
+
         if (ImGui::BeginTable("/event_data", 2, flags))
         {
             ImGui::TableSetupColumn("Envelope");
@@ -743,6 +767,8 @@ struct EventServer {
     std::vector<EventMessages::ShowPlotEventMessage> received_show_plot_data_;
     std::vector<EventMessages::ShowTextEventMessage> received_show_text_data_;
     std::vector<std::tuple<std::string, std::string>> received_messages_;
+
+    std::queue<std::pair<EventMessages::EventType, std::shared_ptr<void>>> send_message_queue_;
 };
 
 
@@ -923,7 +949,6 @@ int main(void)
         // Gather some numbers for layouting
         float frame_height = ImGui::GetFrameHeight();
         float item_inner_spacing = style.ItemInnerSpacing.x;
-        
 
         ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_FittingPolicyDefault_;
         if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags))
@@ -950,7 +975,7 @@ int main(void)
                     if (ImGui::Button("Load Local Data", ImVec2(frame_height * 8.0f + item_inner_spacing * 2.0f, frame_height))) {
 
                         auto selection = pfd::open_file("Select a file").result();
-                        if (!selection.empty()){
+                        if (!selection.empty()) {
                             local_truss_structure_sensor_data_filepath = selection[0];
                             server.loadLocalDataFromFile(selection[0]);
                         }
@@ -1001,7 +1026,7 @@ int main(void)
             if (ImGui::BeginTabItem("Operator Pose Data"))
             {
                 ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
-                if(ImGui::RadioButton("Live Data", !operator_pose_server.use_local_data_))
+                if (ImGui::RadioButton("Live Data", !operator_pose_server.use_local_data_))
                 {
                     operator_pose_server.use_local_data_ = false;
                 }
@@ -1022,7 +1047,7 @@ int main(void)
                     }
 
                     ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
-                    if(ImGui::RadioButton("Forward data", operator_pose_server.forward_data_)) {
+                    if (ImGui::RadioButton("Forward data", operator_pose_server.forward_data_)) {
                         operator_pose_server.forward_data_ = !operator_pose_server.forward_data_;
                     }
                     ImGui::PopStyleColor();
@@ -1088,6 +1113,85 @@ int main(void)
             // Event tab.
             if (ImGui::BeginTabItem("Events"))
             {
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                ImGui::Text("Inject event message");
+                ImGui::PopStyleColor();
+
+                bool send_button_clicked = ImGui::Button("Send", ImVec2(frame_height * 8.0f + item_inner_spacing * 2.0f, frame_height));
+
+                ImGui::SameLine();
+
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(255, 255, 255, 128));
+                static int receiver_selection_idx = 0;
+                static int event_selection_idx = 0;
+                {
+                    const char* items[] = { "Unreal Engine", "HoloLens" };
+                    const char* combo_preview_value = items[receiver_selection_idx];
+                    ImGui::SetNextItemWidth(frame_height * 8.0f + item_inner_spacing * 2.0f);
+                    if (ImGui::BeginCombo("##Receiver", combo_preview_value))
+                    {
+                        for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+                        {
+                            const bool is_selected = (receiver_selection_idx == n);
+                            if (ImGui::Selectable(items[n], is_selected))
+                            {
+                                receiver_selection_idx = n;
+                            }
+
+                            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                            if (is_selected)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+                }
+                ImGui::SameLine();
+                {
+                    const char* items[] = { "Here", "SendResponse" };
+                    const char* combo_preview_value = items[event_selection_idx];
+                    ImGui::SetNextItemWidth(frame_height * 8.0f + item_inner_spacing * 2.0f);
+                    if (ImGui::BeginCombo("##Event", combo_preview_value))
+                    {
+                        for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+                        {
+                            const bool is_selected = (event_selection_idx == n);
+                            if (ImGui::Selectable(items[n], is_selected))
+                            {
+                                event_selection_idx = n;
+                            }
+
+                            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                            if (is_selected)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+                }
+                ImGui::SameLine();
+
+                static char message_text[256] = "";
+                ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
+                ImGui::InputText("##Message", message_text, 256);
+
+                ImGui::PopStyleColor();
+                ImGui::PopStyleColor();
+
+                //TODO dropdown operator id
+
+                if (send_button_clicked)
+                {
+                    if (event_selection_idx == 1)
+                    {
+                        event_server.send_message_queue_.push(std::pair<EventMessages::EventType, std::shared_ptr<void>>{
+                            EventMessages::EventType::SEND_RESPONSE,
+                                std::shared_ptr<void>(new EventMessages::ResponseEventRawData(EventMessages::ResponseType::CONTINUE, message_text))
+                        });
+                    }
+                }
+
+                ImGui::Separator();
+
                 ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
                 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(255, 255, 255, 128));
                 event_server.viewEventData();
