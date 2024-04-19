@@ -808,7 +808,7 @@ struct OperatorPoseMessage {
     {
         HoloLensOperatorID   operator_id;
         std::array<float, 3> position; // 3d position (x,y,z)
-        std::array<float, 4> orientation; // orientation given as quaternion (w,x,y,z)
+        std::array<float, 4> orientation; // orientation given as quaternion (x,y,z,w)
         std::array<float, 3> gaze_ray; // additional directional vector for eye gaze (x,y,z)
     };
 };
