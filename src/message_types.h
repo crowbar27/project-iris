@@ -1038,6 +1038,38 @@ struct TrussStructureMessage {
         return retval;
     }
 
+    static SensorID getSensorTimestamp(SensorID sensor_id) {
+        size_t sid = static_cast<size_t>(sensor_id);
+
+        if(sid >= 0 && sid <= 69)
+        {
+            return SensorID::MOD_1_TIMESTAMP;
+        }
+        else if (sid >= 70 && sid <= 127)
+        {
+            return SensorID::MOD_2_TIMESTAMP;
+        }
+        else if (sid >= 128 && sid <= 173)
+        {
+            return SensorID::MOD_3_TIMESTAMP;
+        }
+        else if (sid >= 174 && sid <= 207)
+        {
+            return SensorID::MOD_4_TIMESTAMP;
+        }
+        else if (sid >= 208 && sid <= 225)
+        {
+            return SensorID::CAM_1_TIMESTAMP;
+        }
+        else if (sid >= 226 && sid <= 243)
+        {
+            return SensorID::CAM_2_TIMESTAMP;
+        }
+        else {
+            return SensorID::MOD_1_TIMESTAMP; // should never be reached
+        }
+    }
+
     struct RawSensorData
     {
         double data[sensor_cnt];
