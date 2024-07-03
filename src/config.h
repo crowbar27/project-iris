@@ -19,12 +19,12 @@ namespace iris
     // UDP broadcast adresses of control system
     constexpr std::array<std::string, 6> d1244BroadcastIps() {
         return {
-            "upd://225.1.1.1",
-            "upd://226.1.1.1",
-            "upd://227.1.1.1",
-            "upd://228.1.1.1",
-            "upd://229.1.1.1",
-            "upd://230.1.1.1",
+            "225.1.1.1",
+            "226.1.1.1",
+            "227.1.1.1",
+            "228.1.1.1",
+            "229.1.1.1",
+            "230.1.1.1",
         };
     }
 

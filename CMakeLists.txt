@@ -52,6 +52,7 @@ endif()
 
 find_package(HighFive REQUIRED)
 find_package(cppzmq)
+find_package(wil)
 
 add_executable(project-iris "")
 
@@ -62,7 +63,7 @@ target_sources(project-iris
         src/message_types.h
 )
 
-target_link_libraries(project-iris PUBLIC HighFive cppzmq)
+target_link_libraries(project-iris PUBLIC HighFive cppzmq WIL::WIL)
 
 if(USE_GL)
 

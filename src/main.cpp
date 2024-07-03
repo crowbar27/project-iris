@@ -1,3 +1,7 @@
+#define NOMINMAX
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -22,6 +26,8 @@
 
 #include <format>
 
+#include "wil/resource.h"
+
 #include "config.h"
 #include "message_types.h"
 
@@ -34,6 +40,59 @@ namespace TheiaColorPalette
     static constexpr ImVec4 orange(float alpha = 1.0f) { return ImVec4(1.0f, 0.5f, 0.0f, alpha); }
 
     static constexpr ImVec4 green(float alpha = 1.0f) { return ImVec4(0.1f, 1.0f, 0.7f, alpha); }
+}
+
+struct UDPReceiverContext {
+    wil::unique_socket   socket;
+    std::array<char, 70> buffer;
+    WSAOVERLAPPED        overlapped;
+    sockaddr_in          peer;
+    int                  peer_length;
+    WSABUF               buf;
+    DWORD                flags;
+};
+
+wil::unique_socket createUDPReceiveSocket(std::string IP, int port)
+{
+    // Prepare UDP multicast receiver
+    wil::unique_socket s(WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_OVERLAPPED));
+    if (!s)
+    {
+        throw std::system_error(WSAGetLastError(), std::system_category());
+    }
+    int optval = 1;
+    if ((setsockopt(s.get(), SOL_SOCKET, SO_REUSEADDR, (char*)&optval, sizeof(optval))) < 0)
+    {
+        throw std::system_error(WSAGetLastError(), std::system_category());
+    }
+
+    // Allow any address
+    sockaddr_in AllowAddr;
+    memset(&AllowAddr, 0, sizeof(AllowAddr));
+    AllowAddr.sin_family = AF_INET;
+    AllowAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    AllowAddr.sin_port = htons(port);
+
+    // Bind socket
+    if (bind(s.get(), (struct sockaddr*)&AllowAddr, sizeof(AllowAddr)) < 0) {
+        throw std::system_error(WSAGetLastError(), std::system_category());
+    }
+
+    // Membership setting
+    ip_mreq JoinReq;
+    if (inet_pton(AF_INET, (PCSTR)(IP.c_str()), &JoinReq.imr_multiaddr.s_addr) < 0) {
+        throw std::system_error(WSAGetLastError(), std::system_category());
+    }
+    // This can be used to restrict to only receive form particular sender
+    JoinReq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+    // Join membership
+    if ((setsockopt(s.get(), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&JoinReq, sizeof(JoinReq))) < 0)
+    {
+        throw std::system_error(WSAGetLastError(), std::system_category());
+    }
+
+    return s;
 }
 
 struct DataServer {
@@ -60,25 +119,101 @@ struct DataServer {
         auto t_0 = std::chrono::high_resolution_clock::now();
         auto elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
 
-        while (is_running_) {
+        try {
 
-            if (!local_data_.empty() && is_sending_)
+            std::array<wil::unique_event, 6> events;
+
+            std::array<UDPReceiverContext, 6> udp_sockets;
+            for (int i = 0; i < 6; ++i)
             {
-                while (elapsed_time + (1.0 / send_rate_) < std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count()) {
-                    publisher.send(zmq::message_t(TrussStructureMessage::envelope().data(), TrussStructureMessage::envelope().size()), zmq::send_flags::sndmore);
-                    publisher.send(zmq::message_t(&(local_data_[current_data_row_++]), sizeof(TrussStructureMessage::RawSensorData)));
-                    elapsed_time += (1.0 / send_rate_);
-                }
+                udp_sockets[i].socket = createUDPReceiveSocket(iris::d1244BroadcastIps()[i], std::stoi(iris::d1244BroadcastPorts()[i]));
+                events[i].create(wil::EventOptions::ManualReset);
 
-                if (current_data_row_ >= local_data_.size()) {
-                    current_data_row_ = 0;
+                udp_sockets[i].buf.buf = udp_sockets[i].buffer.data();
+                udp_sockets[i].buf.len = udp_sockets[i].buffer.size();
+                udp_sockets[i].flags = 0;
+                udp_sockets[i].peer_length = sizeof(udp_sockets[i].peer);
+                udp_sockets[i].overlapped = { 0 };
+                udp_sockets[i].overlapped.hEvent = events[i].get();
+
+                auto status = WSARecvFrom(
+                    udp_sockets[i].socket.get(),
+                    &udp_sockets[i].buf, 1,
+                    nullptr,
+                    &udp_sockets[i].flags,
+                    reinterpret_cast<sockaddr*>(&udp_sockets[i].peer),
+                    &udp_sockets[i].peer_length,
+                    &udp_sockets[i].overlapped,
+                    nullptr);
+                
+                if (status < 0 && WSAGetLastError() != WSA_IO_PENDING) {
+                    throw std::system_error(WSAGetLastError(), std::system_category());
                 }
             }
-            else
-            {
-                elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            while (is_running_) {
+
+                auto retval = WaitForMultipleObjects(events.size(), reinterpret_cast<HANDLE*>(events.data()), true, INFINITE);
+
+                if (retval == WAIT_FAILED)
+                {
+                    throw std::system_error(GetLastError(), std::system_category());
+                }
+
+                local_data_.push_back(TrussStructureMessage::RawSensorData());
+                auto tgt_ptr = reinterpret_cast<char*>(local_data_.back().data);
+
+                for (int i = 0; i < 6; ++i)
+                {
+                    DWORD size = 0 ;
+                    WSAGetOverlappedResult(udp_sockets[i].socket.get(),
+                        &udp_sockets[i].overlapped,
+                        &size,
+                        FALSE,
+                        &udp_sockets[i].flags);
+
+                    memcpy(tgt_ptr, udp_sockets[i].buf.buf, size);
+                    tgt_ptr += size;
+
+                    events[i].reset();
+
+                    udp_sockets[i].flags = 0;
+                    udp_sockets[i].peer_length = sizeof(udp_sockets[i].peer);
+                    WSARecvFrom(
+                        udp_sockets[i].socket.get(),
+                        &udp_sockets[i].buf, 1,
+                        nullptr,
+                        &udp_sockets[i].flags,
+                        reinterpret_cast<sockaddr*>(&udp_sockets[i].peer),
+                        &udp_sockets[i].peer_length,
+                        &udp_sockets[i].overlapped,
+                        nullptr);
+                }
+
+                //if (!local_data_.empty() && is_sending_)
+                //{
+                //    while (elapsed_time + (1.0 / send_rate_) < std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count()) {
+                //        publisher.send(zmq::message_t(TrussStructureMessage::envelope().data(), TrussStructureMessage::envelope().size()), zmq::send_flags::sndmore);
+                //        publisher.send(zmq::message_t(&(local_data_[current_data_row_++]), sizeof(TrussStructureMessage::RawSensorData)));
+                //        elapsed_time += (1.0 / send_rate_);
+                //    }
+                //
+                //    if (current_data_row_ >= local_data_.size()) {
+                //        current_data_row_ = 0;
+                //    }
+                //}
+                //else
+                //{
+                //    elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
+                //    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                //}
+
             }
+
+        }
+        catch (std::system_error err)
+        {
+            std::cerr << err.what();
         }
     }
 
