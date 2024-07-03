@@ -15,6 +15,29 @@ namespace iris
     constexpr std::string eventDataSubPort() { return ":5558"; }
 
     constexpr std::string eventDataPubPort() { return ":5559"; }
+
+    // UDP broadcast adresses of control system
+    constexpr std::array<std::string, 6> d1244BroadcastIps() {
+        return {
+            "upd://225.1.1.1",
+            "upd://226.1.1.1",
+            "upd://227.1.1.1",
+            "upd://228.1.1.1",
+            "upd://229.1.1.1",
+            "upd://230.1.1.1",
+        };
+    }
+
+    constexpr std::array<std::string, 6> d1244BroadcastPorts() {
+        return {
+            "4321",
+            "4321",
+            "4321",
+            "4321",
+            "4321",
+            "4322",
+        };
+    }
 }
 
 #endif // !config_h
