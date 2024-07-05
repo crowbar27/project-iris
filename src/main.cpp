@@ -43,16 +43,16 @@ namespace TheiaColorPalette
 }
 
 struct UDPReceiverContext {
-    wil::unique_socket   socket;
-    std::array<char, 70> buffer;
-    WSAOVERLAPPED        overlapped;
-    sockaddr_in          peer;
-    int                  peer_length;
-    WSABUF               buf;
-    DWORD                flags;
+    wil::unique_socket    socket;
+    std::array<char, 560> buffer;
+    WSAOVERLAPPED         overlapped;
+    sockaddr_in           peer;
+    int                   peer_length;
+    WSABUF                buf;
+    DWORD                 flags;
 };
 
-wil::unique_socket createUDPReceiveSocket(std::string IP, int port)
+wil::unique_socket createUDPReceiveSocket(std::vector<std::string> multicast_ip_adresses, int port)
 {
     // Prepare UDP multicast receiver
     wil::unique_socket s(WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_OVERLAPPED));
@@ -60,11 +60,17 @@ wil::unique_socket createUDPReceiveSocket(std::string IP, int port)
     {
         throw std::system_error(WSAGetLastError(), std::system_category());
     }
+    //int optval = 1;
+    //if ((setsockopt(s.get(), SOL_SOCKET, SO_REUSEADDR, (char*)&optval, sizeof(optval))) < 0)
+    //{
+    //    throw std::system_error(WSAGetLastError(), std::system_category());
+    //}
     int optval = 1;
-    if ((setsockopt(s.get(), SOL_SOCKET, SO_REUSEADDR, (char*)&optval, sizeof(optval))) < 0)
+    if ((setsockopt(s.get(), IPPROTO_IP, IP_PKTINFO, (char*)&optval, sizeof(optval))) < 0)
     {
         throw std::system_error(WSAGetLastError(), std::system_category());
     }
+
 
     // Allow any address
     sockaddr_in AllowAddr;
@@ -78,18 +84,20 @@ wil::unique_socket createUDPReceiveSocket(std::string IP, int port)
         throw std::system_error(WSAGetLastError(), std::system_category());
     }
 
-    // Membership setting
-    ip_mreq JoinReq;
-    if (inet_pton(AF_INET, (PCSTR)(IP.c_str()), &JoinReq.imr_multiaddr.s_addr) < 0) {
-        throw std::system_error(WSAGetLastError(), std::system_category());
-    }
-    // This can be used to restrict to only receive form particular sender
-    JoinReq.imr_interface.s_addr = htonl(INADDR_ANY);
+    for (auto& addr : multicast_ip_adresses) {
+        // Membership setting
+        ip_mreq JoinReq;
+        if (inet_pton(AF_INET, (PCSTR)(addr.c_str()), &JoinReq.imr_multiaddr.s_addr) < 0) {
+            throw std::system_error(WSAGetLastError(), std::system_category());
+        }
+        // This can be used to restrict to only receive form particular sender
+        JoinReq.imr_interface.s_addr = htonl(INADDR_ANY);
 
-    // Join membership
-    if ((setsockopt(s.get(), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&JoinReq, sizeof(JoinReq))) < 0)
-    {
-        throw std::system_error(WSAGetLastError(), std::system_category());
+        // Join membership
+        if ((setsockopt(s.get(), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&JoinReq, sizeof(JoinReq))) < 0)
+        {
+            throw std::system_error(WSAGetLastError(), std::system_category());
+        }
     }
 
     return s;
@@ -121,39 +129,42 @@ struct DataServer {
 
         try {
 
-            std::array<wil::unique_event, 6> events;
+            wil::unique_event event;
 
-            std::array<UDPReceiverContext, 6> udp_sockets;
-            for (int i = 0; i < 6; ++i)
-            {
-                udp_sockets[i].socket = createUDPReceiveSocket(iris::d1244BroadcastIps()[i], std::stoi(iris::d1244BroadcastPorts()[i]));
-                events[i].create(wil::EventOptions::ManualReset);
+            std::vector<std::string> broadcast_ips;
+            for (int i = 0; i < iris::d1244BroadcastIpCount(); ++i) {
+                broadcast_ips.push_back(iris::d1244BroadcastIps()[i]);
+            }
 
-                udp_sockets[i].buf.buf = udp_sockets[i].buffer.data();
-                udp_sockets[i].buf.len = udp_sockets[i].buffer.size();
-                udp_sockets[i].flags = 0;
-                udp_sockets[i].peer_length = sizeof(udp_sockets[i].peer);
-                udp_sockets[i].overlapped = { 0 };
-                udp_sockets[i].overlapped.hEvent = events[i].get();
+            UDPReceiverContext udp_socket;
 
-                auto status = WSARecvFrom(
-                    udp_sockets[i].socket.get(),
-                    &udp_sockets[i].buf, 1,
-                    nullptr,
-                    &udp_sockets[i].flags,
-                    reinterpret_cast<sockaddr*>(&udp_sockets[i].peer),
-                    &udp_sockets[i].peer_length,
-                    &udp_sockets[i].overlapped,
-                    nullptr);
-                
-                if (status < 0 && WSAGetLastError() != WSA_IO_PENDING) {
-                    throw std::system_error(WSAGetLastError(), std::system_category());
-                }
+            udp_socket.socket = createUDPReceiveSocket(broadcast_ips, std::stoi(iris::d1244BroadcastPorts()[0]));
+            event.create(wil::EventOptions::ManualReset);
+
+            udp_socket.buf.buf = udp_socket.buffer.data();
+            udp_socket.buf.len = udp_socket.buffer.size();
+            udp_socket.flags = 0;
+            udp_socket.peer_length = sizeof(udp_socket.peer);
+            udp_socket.overlapped = { 0 };
+            udp_socket.overlapped.hEvent = event.get();
+
+            auto status = WSARecvFrom(
+                udp_socket.socket.get(),
+                &udp_socket.buf, 1,
+                nullptr,
+                &udp_socket.flags,
+                reinterpret_cast<sockaddr*>(&udp_socket.peer),
+                &udp_socket.peer_length,
+                &udp_socket.overlapped,
+                nullptr);
+            
+            if (status < 0 && WSAGetLastError() != WSA_IO_PENDING) {
+                throw std::system_error(WSAGetLastError(), std::system_category());
             }
 
             while (is_running_) {
 
-                auto retval = WaitForMultipleObjects(events.size(), reinterpret_cast<HANDLE*>(events.data()), true, INFINITE);
+                auto retval = WSAWaitForMultipleEvents(1, event.addressof(), false, INFINITE, true);
 
                 if (retval == WAIT_FAILED)
                 {
@@ -163,32 +174,33 @@ struct DataServer {
                 local_data_.push_back(TrussStructureMessage::RawSensorData());
                 auto tgt_ptr = reinterpret_cast<char*>(local_data_.back().data);
 
-                for (int i = 0; i < 6; ++i)
-                {
-                    DWORD size = 0 ;
-                    WSAGetOverlappedResult(udp_sockets[i].socket.get(),
-                        &udp_sockets[i].overlapped,
-                        &size,
-                        FALSE,
-                        &udp_sockets[i].flags);
+                DWORD size = 0 ;
+                WSAGetOverlappedResult(udp_socket.socket.get(),
+                    &udp_socket.overlapped,
+                    &size,
+                    FALSE,
+                    &udp_socket.flags);
 
-                    memcpy(tgt_ptr, udp_sockets[i].buf.buf, size);
-                    tgt_ptr += size;
+                // TODO: query paket information to find out destination IP
 
-                    events[i].reset();
-
-                    udp_sockets[i].flags = 0;
-                    udp_sockets[i].peer_length = sizeof(udp_sockets[i].peer);
-                    WSARecvFrom(
-                        udp_sockets[i].socket.get(),
-                        &udp_sockets[i].buf, 1,
-                        nullptr,
-                        &udp_sockets[i].flags,
-                        reinterpret_cast<sockaddr*>(&udp_sockets[i].peer),
-                        &udp_sockets[i].peer_length,
-                        &udp_sockets[i].overlapped,
-                        nullptr);
+                if (size == 464) {
+                    memcpy(tgt_ptr + 560, udp_socket.buf.buf, size);
+                    //tgt_ptr += size;
                 }
+
+                event.reset();
+
+                udp_socket.flags = 0;
+                udp_socket.peer_length = sizeof(udp_socket.peer);
+                WSARecvFrom(
+                    udp_socket.socket.get(),
+                    &udp_socket.buf, 1,
+                    nullptr,
+                    &udp_socket.flags,
+                    reinterpret_cast<sockaddr*>(&udp_socket.peer),
+                    &udp_socket.peer_length,
+                    &udp_socket.overlapped,
+                    nullptr);
 
                 //if (!local_data_.empty() && is_sending_)
                 //{

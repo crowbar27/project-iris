@@ -16,6 +16,8 @@ namespace iris
 
     constexpr std::string eventDataPubPort() { return ":5559"; }
 
+    constexpr int d1244BroadcastIpCount() { return 4; }
+
     // UDP broadcast adresses of control system
     constexpr std::array<std::string, 6> d1244BroadcastIps() {
         return {
@@ -27,6 +29,8 @@ namespace iris
             "230.1.1.1",
         };
     }
+
+    //226.1.1.2",
 
     constexpr std::array<std::string, 6> d1244BroadcastPorts() {
         return {
