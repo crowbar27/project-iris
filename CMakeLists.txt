@@ -61,6 +61,7 @@ target_sources(project-iris
         src/config.h
         src/main.cpp
         src/message_types.h
+        src/udp_multicast_receive.h
 )
 
 target_link_libraries(project-iris PUBLIC HighFive cppzmq WIL::WIL)

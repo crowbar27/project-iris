@@ -1,7 +1,3 @@
-#define NOMINMAX
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -26,10 +22,9 @@
 
 #include <format>
 
-#include "wil/resource.h"
-
 #include "config.h"
 #include "message_types.h"
+#include "udp_multicast_receive.h"
 
 namespace TheiaColorPalette
 {
@@ -42,166 +37,139 @@ namespace TheiaColorPalette
     static constexpr ImVec4 green(float alpha = 1.0f) { return ImVec4(0.1f, 1.0f, 0.7f, alpha); }
 }
 
-struct UDPReceiverContext {
-    wil::unique_socket    socket;
-    std::array<char, 560> buffer;
-    WSAOVERLAPPED         overlapped;
-    sockaddr_in           peer;
-    int                   peer_length;
-    WSABUF                buf;
-    DWORD                 flags;
-};
-
-wil::unique_socket createUDPReceiveSocket(std::vector<std::string> multicast_ip_adresses, int port)
-{
-    // Prepare UDP multicast receiver
-    wil::unique_socket s(WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, WSA_FLAG_OVERLAPPED));
-    if (!s)
-    {
-        throw std::system_error(WSAGetLastError(), std::system_category());
-    }
-    //int optval = 1;
-    //if ((setsockopt(s.get(), SOL_SOCKET, SO_REUSEADDR, (char*)&optval, sizeof(optval))) < 0)
-    //{
-    //    throw std::system_error(WSAGetLastError(), std::system_category());
-    //}
-    int optval = 1;
-    if ((setsockopt(s.get(), IPPROTO_IP, IP_PKTINFO, (char*)&optval, sizeof(optval))) < 0)
-    {
-        throw std::system_error(WSAGetLastError(), std::system_category());
-    }
-
-
-    // Allow any address
-    sockaddr_in AllowAddr;
-    memset(&AllowAddr, 0, sizeof(AllowAddr));
-    AllowAddr.sin_family = AF_INET;
-    AllowAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    AllowAddr.sin_port = htons(port);
-
-    // Bind socket
-    if (bind(s.get(), (struct sockaddr*)&AllowAddr, sizeof(AllowAddr)) < 0) {
-        throw std::system_error(WSAGetLastError(), std::system_category());
-    }
-
-    for (auto& addr : multicast_ip_adresses) {
-        // Membership setting
-        ip_mreq JoinReq;
-        if (inet_pton(AF_INET, (PCSTR)(addr.c_str()), &JoinReq.imr_multiaddr.s_addr) < 0) {
-            throw std::system_error(WSAGetLastError(), std::system_category());
-        }
-        // This can be used to restrict to only receive form particular sender
-        JoinReq.imr_interface.s_addr = htonl(INADDR_ANY);
-
-        // Join membership
-        if ((setsockopt(s.get(), IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&JoinReq, sizeof(JoinReq))) < 0)
-        {
-            throw std::system_error(WSAGetLastError(), std::system_category());
-        }
-    }
-
-    return s;
-}
-
 struct DataServer {
     void startPublisher(zmq::context_t* ctx, std::string const& adress, std::string const& pub_port) {
-        // TODO simulate publishing of live data
-
-        //  Prepare publisher
-        zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
-
-        publisher.bind(adress + pub_port);
-
-        // wait for subscribers to connect?
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-        publisher.send(zmq::str_buffer("A"), zmq::send_flags::sndmore);
-        publisher.send(zmq::str_buffer("Debug message in A envelope"));
-
-        send_rate_ = 1;
-        current_data_row_ = 0;
-        is_sending_ = false;
-
-        is_running_ = true;
-
-        auto t_0 = std::chrono::high_resolution_clock::now();
-        auto elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
-
         try {
 
-            wil::unique_event event;
+            //  Prepare publisher
+            zmq::socket_t publisher(*ctx, zmq::socket_type::pub);
+            publisher.bind(adress + pub_port);
 
-            std::vector<std::string> broadcast_ips;
-            for (int i = 0; i < iris::d1244BroadcastIpCount(); ++i) {
-                broadcast_ips.push_back(iris::d1244BroadcastIps()[i]);
+            // wait for subscribers to connect?
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+            publisher.send(zmq::str_buffer("A"), zmq::send_flags::sndmore);
+            publisher.send(zmq::str_buffer("Debug message in A envelope"));
+
+            // Init params for local file mode
+            send_rate_ = 1;
+            current_data_row_ = 0;
+            is_sending_ = false;
+
+            // Init live data receiving
+            std::array<char, 64> group;
+            WSADATA wsaData{ 0 };
+
+            if (::WSAStartup(MAKEWORD(2, 2), &wsaData) == SOCKET_ERROR) {
+                throw std::system_error(::WSAGetLastError(), std::system_category());
             }
 
-            UDPReceiverContext udp_socket;
+            auto wsaClean = wil::scope_exit([](void) {
+                ::WSACleanup();
+                });
 
-            udp_socket.socket = createUDPReceiveSocket(broadcast_ips, std::stoi(iris::d1244BroadcastPorts()[0]));
-            event.create(wil::EventOptions::ManualReset);
+            std::array<iris::receive_context, 2> receivers{
+                iris::receive_context(iris::d1244BroadcastPorts()[0], {iris::d1244BroadcastIps()[0], iris::d1244BroadcastIps()[1], iris::d1244BroadcastIps()[2], iris::d1244BroadcastIps()[3], iris::d1244BroadcastIps()[4]}),
+                iris::receive_context(iris::d1244BroadcastPorts()[5], {iris::d1244BroadcastIps()[5]}),
+            };
 
-            udp_socket.buf.buf = udp_socket.buffer.data();
-            udp_socket.buf.len = udp_socket.buffer.size();
-            udp_socket.flags = 0;
-            udp_socket.peer_length = sizeof(udp_socket.peer);
-            udp_socket.overlapped = { 0 };
-            udp_socket.overlapped.hEvent = event.get();
-
-            auto status = WSARecvFrom(
-                udp_socket.socket.get(),
-                &udp_socket.buf, 1,
-                nullptr,
-                &udp_socket.flags,
-                reinterpret_cast<sockaddr*>(&udp_socket.peer),
-                &udp_socket.peer_length,
-                &udp_socket.overlapped,
-                nullptr);
-
-            if (status < 0 && WSAGetLastError() != WSA_IO_PENDING) {
-                throw std::system_error(WSAGetLastError(), std::system_category());
+            std::array<wil::unique_event, receivers.size()> events;
+            std::for_each(events.begin(), events.end(), [](wil::unique_event& e) {
+                e.create(wil::EventOptions::ManualReset);
+                });
+            for (std::size_t i = 0; i < events.size(); ++i) {
+                receivers[i].overlapped.hEvent = events[i].get();
             }
+
+            const auto WSARecvMsg = iris::get_wsa_recv_msg(receivers.front().socket);
+
+            // start sending/receiving
+            auto t_0 = std::chrono::high_resolution_clock::now();
+            auto elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
+            is_running_ = true;
 
             while (is_running_) {
 
-                if (!use_local_data_) {
-                    auto retval = WSAWaitForMultipleEvents(1, event.addressof(), false, INFINITE, true);
+                if (!use_local_data_) // live data handing
+                {
+                    TrussStructureMessage recv_message;
+                    std::array<bool, 6> recv_parts = {false,false,false,false,true,true};
+                    bool recv_complete = false;
 
-                    if (retval == WAIT_FAILED)
+                    while (!recv_complete)
                     {
-                        throw std::system_error(GetLastError(), std::system_category());
+                        for (auto& r : receivers) {
+                            auto status = WSARecvMsg(r.socket.get(),
+                                &r.message,
+                                nullptr,
+                                &r.overlapped,
+                                nullptr);
+                            if (status == SOCKET_ERROR) {
+                                auto error = ::WSAGetLastError();
+                                if (error != WSA_IO_PENDING) {
+                                    throw std::system_error(::WSAGetLastError(), std::system_category());
+                                }
+                            }
+                        }
+
+                        auto status = ::WSAWaitForMultipleEvents(static_cast<DWORD>(events.size()),
+                            reinterpret_cast<HANDLE*>(events.data()), FALSE, INFINITE, FALSE);
+                        switch (status) {
+                        case WSA_WAIT_FAILED:
+                            throw std::system_error(::WSAGetLastError(), std::system_category());
+                        case WSA_WAIT_TIMEOUT:
+                            continue;
+                        }
+
+                        auto r = status - WSA_WAIT_EVENT_0;
+                        auto& receiver = receivers[r];
+                        auto pkt_info = iris::get_packet_info(receiver.message);
+                        assert(pkt_info != nullptr);
+                        std::string dest_ip = ::inet_ntop(AF_INET, &pkt_info->ipi_addr, group.data(), group.size());
+                        std::cout << "Received via " << dest_ip << std::endl;
+                        receiver.message.dwFlags = 0;
+                        events[r].ResetEvent();
+
+                        if (dest_ip == iris::d1244BroadcastIps()[0])
+                        {
+                            //TODO: copy data to message
+                            recv_parts[0] = true;
+                        }
+                        else if (dest_ip == iris::d1244BroadcastIps()[1])
+                        {
+                            //TODO: copy data to message
+                            recv_parts[1] = true;
+                        }
+                        else if (dest_ip == iris::d1244BroadcastIps()[2])
+                        {
+                            //TODO: copy data to message
+                            recv_parts[2] = true;
+                        }
+                        else if (dest_ip == iris::d1244BroadcastIps()[3])
+                        {
+                            //TODO: copy data to message
+                            recv_parts[3] = true;
+                        }
+                        else if (dest_ip == iris::d1244BroadcastIps()[4])
+                        {
+                            //TODO: copy data to message
+                            recv_parts[4] = true;
+                        }
+                        else if (dest_ip == iris::d1244BroadcastIps()[5])
+                        {
+                            //TODO: copy data to message
+                            recv_parts[5] = true;
+                        }
+
+                        // check if all parts of a truss strcuture sensor message have been collected
+                        recv_complete = true;
+                        for (auto& recv_part : recv_parts)
+                        {
+                            recv_complete &= recv_part;
+                        }
                     }
 
-                    local_data_.push_back(TrussStructureMessage::RawSensorData());
-                    auto tgt_ptr = reinterpret_cast<char*>(local_data_.back().data);
-
-                    DWORD size = 0;
-                    WSAGetOverlappedResult(udp_socket.socket.get(),
-                        &udp_socket.overlapped,
-                        &size,
-                        FALSE,
-                        &udp_socket.flags);
-
-                    // TODO: query paket information to find out destination IP
-
-                    if (size == 464) {
-                        memcpy(tgt_ptr + 560, udp_socket.buf.buf, size);
-                        //tgt_ptr += size;
-                    }
-
-                    event.reset();
-
-                    udp_socket.flags = 0;
-                    udp_socket.peer_length = sizeof(udp_socket.peer);
-                    WSARecvFrom(
-                        udp_socket.socket.get(),
-                        &udp_socket.buf, 1,
-                        nullptr,
-                        &udp_socket.flags,
-                        reinterpret_cast<sockaddr*>(&udp_socket.peer),
-                        &udp_socket.peer_length,
-                        &udp_socket.overlapped,
-                        nullptr);
+                    std::cout << "All parts receviced" << std::endl;
                 }
                 else
                 {
@@ -1074,6 +1042,13 @@ int main(void)
 
     auto event_exec = std::async(std::launch::async, &EventServer::start, &event_server, &ctx, iris::serverIp(), iris::eventDataSubPort(), iris::eventDataPubPort());
 
+    // debug UDP multicast by sending some packages myself
+    std::atomic<bool> run_server(true);
+    {
+        std::thread server(iris::push_data2, std::ref(run_server));
+        server.detach();
+    }
+
     std::string local_truss_structure_sensor_data_filepath;
 
     while (!glfwWindowShouldClose(window))
@@ -1369,6 +1344,8 @@ int main(void)
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    run_server.store(false);
 
     glfwDestroyWindow(window);
 
