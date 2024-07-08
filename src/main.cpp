@@ -157,69 +157,72 @@ struct DataServer {
                 &udp_socket.peer_length,
                 &udp_socket.overlapped,
                 nullptr);
-            
+
             if (status < 0 && WSAGetLastError() != WSA_IO_PENDING) {
                 throw std::system_error(WSAGetLastError(), std::system_category());
             }
 
             while (is_running_) {
 
-                auto retval = WSAWaitForMultipleEvents(1, event.addressof(), false, INFINITE, true);
+                if (!use_local_data_) {
+                    auto retval = WSAWaitForMultipleEvents(1, event.addressof(), false, INFINITE, true);
 
-                if (retval == WAIT_FAILED)
+                    if (retval == WAIT_FAILED)
+                    {
+                        throw std::system_error(GetLastError(), std::system_category());
+                    }
+
+                    local_data_.push_back(TrussStructureMessage::RawSensorData());
+                    auto tgt_ptr = reinterpret_cast<char*>(local_data_.back().data);
+
+                    DWORD size = 0;
+                    WSAGetOverlappedResult(udp_socket.socket.get(),
+                        &udp_socket.overlapped,
+                        &size,
+                        FALSE,
+                        &udp_socket.flags);
+
+                    // TODO: query paket information to find out destination IP
+
+                    if (size == 464) {
+                        memcpy(tgt_ptr + 560, udp_socket.buf.buf, size);
+                        //tgt_ptr += size;
+                    }
+
+                    event.reset();
+
+                    udp_socket.flags = 0;
+                    udp_socket.peer_length = sizeof(udp_socket.peer);
+                    WSARecvFrom(
+                        udp_socket.socket.get(),
+                        &udp_socket.buf, 1,
+                        nullptr,
+                        &udp_socket.flags,
+                        reinterpret_cast<sockaddr*>(&udp_socket.peer),
+                        &udp_socket.peer_length,
+                        &udp_socket.overlapped,
+                        nullptr);
+                }
+                else
                 {
-                    throw std::system_error(GetLastError(), std::system_category());
+                    if (!local_data_.empty() && is_sending_)
+                    {
+                        while (elapsed_time + (1.0 / send_rate_) < std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count()) {
+                            publisher.send(zmq::message_t(TrussStructureMessage::envelope().data(), TrussStructureMessage::envelope().size()), zmq::send_flags::sndmore);
+                            publisher.send(zmq::message_t(&(local_data_[current_data_row_++]), sizeof(TrussStructureMessage::RawSensorData)));
+                            elapsed_time += (1.0 / send_rate_);
+                        }
+
+                        if (current_data_row_ >= local_data_.size()) {
+                            current_data_row_ = 0;
+                        }
+                    }
+                    else
+                    {
+                        elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
                 }
-
-                local_data_.push_back(TrussStructureMessage::RawSensorData());
-                auto tgt_ptr = reinterpret_cast<char*>(local_data_.back().data);
-
-                DWORD size = 0 ;
-                WSAGetOverlappedResult(udp_socket.socket.get(),
-                    &udp_socket.overlapped,
-                    &size,
-                    FALSE,
-                    &udp_socket.flags);
-
-                // TODO: query paket information to find out destination IP
-
-                if (size == 464) {
-                    memcpy(tgt_ptr + 560, udp_socket.buf.buf, size);
-                    //tgt_ptr += size;
-                }
-
-                event.reset();
-
-                udp_socket.flags = 0;
-                udp_socket.peer_length = sizeof(udp_socket.peer);
-                WSARecvFrom(
-                    udp_socket.socket.get(),
-                    &udp_socket.buf, 1,
-                    nullptr,
-                    &udp_socket.flags,
-                    reinterpret_cast<sockaddr*>(&udp_socket.peer),
-                    &udp_socket.peer_length,
-                    &udp_socket.overlapped,
-                    nullptr);
-
-                //if (!local_data_.empty() && is_sending_)
-                //{
-                //    while (elapsed_time + (1.0 / send_rate_) < std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count()) {
-                //        publisher.send(zmq::message_t(TrussStructureMessage::envelope().data(), TrussStructureMessage::envelope().size()), zmq::send_flags::sndmore);
-                //        publisher.send(zmq::message_t(&(local_data_[current_data_row_++]), sizeof(TrussStructureMessage::RawSensorData)));
-                //        elapsed_time += (1.0 / send_rate_);
-                //    }
-                //
-                //    if (current_data_row_ >= local_data_.size()) {
-                //        current_data_row_ = 0;
-                //    }
-                //}
-                //else
-                //{
-                //    elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
-                //    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                //}
-
             }
 
         }
@@ -317,17 +320,19 @@ struct DataServer {
         }
     }
 
-    std::unique_ptr<H5Easy::File> local_data_file_;
-    //std::vector<std::vector<double>> local_data_;
-    std::vector<TrussStructureMessage::RawSensorData> local_data_;
-
-    std::atomic<float> send_rate_;
-    std::atomic<size_t> current_data_row_;
-    std::atomic_bool is_sending_;
-
     std::atomic_bool is_running_;
+    bool             use_local_data_;
 
-    bool use_local_data_;
+    // local data mode variables
+    std::unique_ptr<H5Easy::File>                     local_data_file_;
+    std::vector<TrussStructureMessage::RawSensorData> local_data_;
+    std::atomic<float>                                send_rate_;
+    std::atomic<size_t>                               current_data_row_;
+    std::atomic_bool                                  is_sending_;
+
+    // live data mode variables
+    std::vector<TrussStructureMessage::RawSensorData> received_data_ringbuffer_;
+    size_t                                            current_ringbuffer_idx_;
 };
 
 struct DummySubscriber {
@@ -1103,21 +1108,22 @@ int main(void)
             ImGui::SetNextItemWidth(frame_height * 12.0f + item_inner_spacing * 4.0f);
             if (ImGui::BeginTabItem("Truss Structure Sensor Data"))
             {
-                {
-                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
-                    if (ImGui::RadioButton("Live Data", !server.use_local_data_))
-                    {
-                        //server.use_local_data_ = false;
-                        server.use_local_data_ = true;
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::RadioButton("Local File", server.use_local_data_))
-                    {
-                        server.use_local_data_ = true;
-                    }
-                    ImGui::PopStyleColor();
-                    ImGui::Separator();
 
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                if (ImGui::RadioButton("Live Data", !server.use_local_data_))
+                {
+                    server.use_local_data_ = false;
+                }
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Local File", server.use_local_data_))
+                {
+                    server.use_local_data_ = true;
+                }
+                ImGui::PopStyleColor();
+                ImGui::Separator();
+
+                if (server.use_local_data_)
+                {
                     // Loading local data
                     if (ImGui::Button("Load Local Data", ImVec2(frame_height * 8.0f + item_inner_spacing * 2.0f, frame_height))) {
 
@@ -1165,6 +1171,10 @@ int main(void)
                     server.previewLocalData();
                     ImGui::PopStyleColor();
                     ImGui::PopStyleColor();
+                }
+                else
+                {
+
                 }
 
                 ImGui::EndTabItem();
