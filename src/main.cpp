@@ -38,6 +38,53 @@ namespace TheiaColorPalette
 }
 
 struct DataServer {
+private:
+    void previewData(std::vector<TrussStructureMessage::RawSensorData> const& data, size_t current_row, bool pin_current_row) {
+        ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable |
+            ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
+            ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+
+        //if (ImGui::Begin("Local HDF5 data)")) {
+        if (pin_current_row)
+        {
+            ImGui::SetNextWindowScroll(ImVec2(0.0f, static_cast<float>(current_row) * ImGui::TableGetHeaderRowHeight()));
+        }
+        if (ImGui::BeginTable("/meas_data", TrussStructureMessage::sensor_cnt, flags))
+        {
+            for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column) {
+                ImGui::TableSetupColumn(TrussStructureMessage::getLabel(column).c_str());
+            }
+            ImGui::TableHeadersRow();
+            ImGuiListClipper clipper;
+            clipper.Begin(data.size());
+            while (clipper.Step()) {
+                for (auto row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+                    ImGui::TableNextRow();
+                    auto& row_data = data[row];
+                    for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column)
+                    {
+                        ImGui::TableSetColumnIndex(column);
+                        if (row == current_row) {
+                            ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(TheiaColorPalette::orange()));
+                        }
+                        else
+                        {
+                            ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg,
+                                row % 2 ? ImGui::GetColorU32(TheiaColorPalette::white(0.4f)) : ImGui::GetColorU32(TheiaColorPalette::white(0.2f))
+                            );
+                        }
+
+                        //ImGui::Text("Row %d Column %d", row, column);
+                        ImGui::Text("%04.4f", row_data.data[column]);
+                    }
+                }
+            }
+            ImGui::EndTable();
+        }
+        //}
+        //ImGui::End();
+    }
+public:
     void startPublisher(zmq::context_t* ctx, std::string const& adress, std::string const& pub_port) {
         try {
 
@@ -57,6 +104,8 @@ struct DataServer {
             is_sending_ = false;
 
             // Init live data receiving
+            received_data_ringbuffer_ = std::vector<TrussStructureMessage::RawSensorData>(32);
+            current_ringbuffer_idx_ = 0;
             std::array<char, 64> group;
             WSADATA wsaData{ 0 };
 
@@ -92,7 +141,8 @@ struct DataServer {
 
                 if (!use_local_data_) // live data handing
                 {
-                    TrussStructureMessage recv_message;
+                    current_ringbuffer_idx_ = (current_ringbuffer_idx_ + 1) % received_data_ringbuffer_.size();
+                    TrussStructureMessage::RawSensorData& recv_message = received_data_ringbuffer_[current_ringbuffer_idx_];
                     std::array<bool, 6> recv_parts = {false,false,false,false,true,true};
                     bool recv_complete = false;
 
@@ -132,32 +182,32 @@ struct DataServer {
 
                         if (dest_ip == iris::d1244BroadcastIps()[0])
                         {
-                            //TODO: copy data to message
+                            std::memcpy(&recv_message.data[static_cast<size_t>(TrussStructureMessage::SensorID::MOD_1_NUMVARS)], receiver.received.data(), receiver.received.size());
                             recv_parts[0] = true;
                         }
                         else if (dest_ip == iris::d1244BroadcastIps()[1])
                         {
-                            //TODO: copy data to message
+                            std::memcpy(&recv_message.data[static_cast<size_t>(TrussStructureMessage::SensorID::MOD_2_NUMVARS)], receiver.received.data(), receiver.received.size());
                             recv_parts[1] = true;
                         }
                         else if (dest_ip == iris::d1244BroadcastIps()[2])
                         {
-                            //TODO: copy data to message
+                            std::memcpy(&recv_message.data[static_cast<size_t>(TrussStructureMessage::SensorID::MOD_3_NUMVARS)], receiver.received.data(), receiver.received.size());
                             recv_parts[2] = true;
                         }
                         else if (dest_ip == iris::d1244BroadcastIps()[3])
                         {
-                            //TODO: copy data to message
+                            std::memcpy(&recv_message.data[static_cast<size_t>(TrussStructureMessage::SensorID::MOD_4_NUMVARS)], receiver.received.data(), receiver.received.size());
                             recv_parts[3] = true;
                         }
                         else if (dest_ip == iris::d1244BroadcastIps()[4])
                         {
-                            //TODO: copy data to message
+                            std::memcpy(&recv_message.data[static_cast<size_t>(TrussStructureMessage::SensorID::CAM_1_NUMVARS)], receiver.received.data(), receiver.received.size());
                             recv_parts[4] = true;
                         }
                         else if (dest_ip == iris::d1244BroadcastIps()[5])
                         {
-                            //TODO: copy data to message
+                            std::memcpy(&recv_message.data[static_cast<size_t>(TrussStructureMessage::SensorID::CAM_2_NUMVARS)], receiver.received.data(), receiver.received.size());
                             recv_parts[5] = true;
                         }
 
@@ -169,7 +219,10 @@ struct DataServer {
                         }
                     }
 
-                    std::cout << "All parts receviced" << std::endl;
+                    // forward message to zmq subscribers
+                    publisher.send(zmq::message_t(TrussStructureMessage::envelope().data(), TrussStructureMessage::envelope().size()), zmq::send_flags::sndmore);
+                    publisher.send(zmq::message_t(&(recv_message), sizeof(TrussStructureMessage::RawSensorData)));
+
                 }
                 else
                 {
@@ -242,49 +295,15 @@ struct DataServer {
     }
 
     void previewLocalData() {
-        // TODO draw local data as imgui table
-
         if (local_data_file_ != nullptr)
         {
-            ImGuiTableFlags flags = ImGuiTableFlags_Resizable | ImGuiTableFlags_Hideable |
-                ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
-                ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY | ImGuiTableFlags_ScrollX;
+            previewData(local_data_, current_data_row_, pin_current_data_row_);
+        }
+    }
 
-            //if (ImGui::Begin("Local HDF5 data)")) {
-            if (ImGui::BeginTable("/meas_data", TrussStructureMessage::sensor_cnt, flags))
-            {
-                for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column) {
-                    ImGui::TableSetupColumn(TrussStructureMessage::getLabel(column).c_str());
-                }
-                ImGui::TableHeadersRow();
-                ImGuiListClipper clipper;
-                clipper.Begin(local_data_.size());
-                while (clipper.Step()) {
-                    for (auto row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
-                        ImGui::TableNextRow();
-                        auto& row_data = local_data_[row];
-                        for (int column = 0; column < TrussStructureMessage::sensor_cnt; ++column)
-                        {
-                            ImGui::TableSetColumnIndex(column);
-                            if (row == current_data_row_) {
-                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, ImGui::GetColorU32(TheiaColorPalette::orange()));
-                            }
-                            else
-                            {
-                                ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg,
-                                    row % 2 ? ImGui::GetColorU32(TheiaColorPalette::white(0.4f)) : ImGui::GetColorU32(TheiaColorPalette::white(0.2f))
-                                );
-                            }
-
-                            //ImGui::Text("Row %d Column %d", row, column);
-                            ImGui::Text("%04.4f", row_data.data[column]);
-                        }
-                    }
-                }
-                ImGui::EndTable();
-            }
-            //}
-            //ImGui::End();
+    void previewReceivedData() {
+        if (!received_data_ringbuffer_.empty()) {
+            previewData(received_data_ringbuffer_, current_ringbuffer_idx_, true);
         }
     }
 
@@ -296,6 +315,7 @@ struct DataServer {
     std::vector<TrussStructureMessage::RawSensorData> local_data_;
     std::atomic<float>                                send_rate_;
     std::atomic<size_t>                               current_data_row_;
+    std::atomic_bool                                  pin_current_data_row_;
     std::atomic_bool                                  is_sending_;
 
     // live data mode variables
@@ -1043,11 +1063,11 @@ int main(void)
     auto event_exec = std::async(std::launch::async, &EventServer::start, &event_server, &ctx, iris::serverIp(), iris::eventDataSubPort(), iris::eventDataPubPort());
 
     // debug UDP multicast by sending some packages myself
-    std::atomic<bool> run_server(true);
-    {
-        std::thread server(iris::push_data2, std::ref(run_server));
-        server.detach();
-    }
+    //std::atomic<bool> run_server(true);
+    //{
+    //    std::thread server(iris::push_data2, std::ref(run_server));
+    //    server.detach();
+    //}
 
     std::string local_truss_structure_sensor_data_filepath;
 
@@ -1136,7 +1156,9 @@ int main(void)
 
                     static bool pin_sent_line = false;
                     ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
-                    ImGui::RadioButton("Pin last sent data", &pin_sent_line);
+                    if(ImGui::RadioButton("Pin last sent data", server.pin_current_data_row_)){
+                        server.pin_current_data_row_ = !server.pin_current_data_row_;
+                    }
                     ImGui::PopStyleColor();
 
                     ImGui::Separator();
@@ -1149,7 +1171,11 @@ int main(void)
                 }
                 else
                 {
-
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 234));
+                    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(255, 255, 255, 128));
+                    server.previewReceivedData();
+                    ImGui::PopStyleColor();
+                    ImGui::PopStyleColor();
                 }
 
                 ImGui::EndTabItem();
@@ -1345,7 +1371,8 @@ int main(void)
         glfwPollEvents();
     }
 
-    run_server.store(false);
+    //local debugging of upd multicast
+    //run_server.store(false);
 
     glfwDestroyWindow(window);
 
