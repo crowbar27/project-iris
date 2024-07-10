@@ -506,7 +506,7 @@ struct TrussStructureMessage {
         "cam_30_4_nw_y",
         "cam_31_4_no_z",
         "cam_32_4_no_y"
-        });
+            });
 
         return sensor_labels[id];
     }
@@ -770,7 +770,7 @@ struct TrussStructureMessage {
         SensorType::OPTICAL,
         SensorType::OPTICAL,
             }
-            );
+        );
 
         return sensor_types[id];
     }
@@ -784,11 +784,161 @@ struct TrussStructureMessage {
 
 };
 
+struct TrussStructureFaultMessage {
+    typedef double InternalFormat;
+
+    static constexpr std::string envelope() { return "TSF"; }
+
+    static const size_t fault_channel_cnt = 2;
+
+    static const size_t max_fault_class = 128;
+
+    static std::vector<TrussStructureMessage::SensorID> getSensorIDs(size_t fault_class) {
+        static const auto sensor_ids = std::to_array<std::vector<TrussStructureMessage::SensorID>>({
+{TrussStructureMessage::SensorID::MOD_1_ELONG_25,TrussStructureMessage::SensorID::MOD_1_ELONG_26,TrussStructureMessage::SensorID::MOD_1_ELONG_27,TrussStructureMessage::SensorID::MOD_1_ELONG_28},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_1,TrussStructureMessage::SensorID::MOD_1_ELONG_2,TrussStructureMessage::SensorID::MOD_1_ELONG_3,TrussStructureMessage::SensorID::MOD_1_ELONG_4},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_9,TrussStructureMessage::SensorID::MOD_1_ELONG_10,TrussStructureMessage::SensorID::MOD_1_ELONG_11,TrussStructureMessage::SensorID::MOD_1_ELONG_12},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_17,TrussStructureMessage::SensorID::MOD_1_ELONG_18,TrussStructureMessage::SensorID::MOD_1_ELONG_19,TrussStructureMessage::SensorID::MOD_1_ELONG_20},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_29,TrussStructureMessage::SensorID::MOD_1_ELONG_30},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_7,TrussStructureMessage::SensorID::MOD_1_ELONG_8},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_5,TrussStructureMessage::SensorID::MOD_1_ELONG_6},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_15,TrussStructureMessage::SensorID::MOD_1_ELONG_16},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_13,TrussStructureMessage::SensorID::MOD_1_ELONG_14},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_23,TrussStructureMessage::SensorID::MOD_1_ELONG_24},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_21,TrussStructureMessage::SensorID::MOD_1_ELONG_22},
+{TrussStructureMessage::SensorID::MOD_1_ELONG_31,TrussStructureMessage::SensorID::MOD_1_ELONG_32},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_25,TrussStructureMessage::SensorID::MOD_2_ELONG_26,TrussStructureMessage::SensorID::MOD_2_ELONG_27,TrussStructureMessage::SensorID::MOD_2_ELONG_28},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_1,TrussStructureMessage::SensorID::MOD_2_ELONG_2,TrussStructureMessage::SensorID::MOD_2_ELONG_3,TrussStructureMessage::SensorID::MOD_2_ELONG_4},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_9,TrussStructureMessage::SensorID::MOD_2_ELONG_10,TrussStructureMessage::SensorID::MOD_2_ELONG_11,TrussStructureMessage::SensorID::MOD_2_ELONG_12},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_17,TrussStructureMessage::SensorID::MOD_2_ELONG_18,TrussStructureMessage::SensorID::MOD_2_ELONG_19,TrussStructureMessage::SensorID::MOD_2_ELONG_20},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_29,TrussStructureMessage::SensorID::MOD_2_ELONG_30},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_7,TrussStructureMessage::SensorID::MOD_2_ELONG_8},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_5,TrussStructureMessage::SensorID::MOD_2_ELONG_6},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_15,TrussStructureMessage::SensorID::MOD_2_ELONG_16},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_13,TrussStructureMessage::SensorID::MOD_2_ELONG_14},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_23,TrussStructureMessage::SensorID::MOD_2_ELONG_24},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_21,TrussStructureMessage::SensorID::MOD_2_ELONG_22},
+{TrussStructureMessage::SensorID::MOD_2_ELONG_31,TrussStructureMessage::SensorID::MOD_2_ELONG_32},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_25,TrussStructureMessage::SensorID::MOD_3_ELONG_26,TrussStructureMessage::SensorID::MOD_3_ELONG_27,TrussStructureMessage::SensorID::MOD_3_ELONG_28},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_1,TrussStructureMessage::SensorID::MOD_3_ELONG_2,TrussStructureMessage::SensorID::MOD_3_ELONG_3,TrussStructureMessage::SensorID::MOD_3_ELONG_4},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_9,TrussStructureMessage::SensorID::MOD_3_ELONG_10,TrussStructureMessage::SensorID::MOD_3_ELONG_11,TrussStructureMessage::SensorID::MOD_3_ELONG_12},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_17,TrussStructureMessage::SensorID::MOD_3_ELONG_18,TrussStructureMessage::SensorID::MOD_3_ELONG_19,TrussStructureMessage::SensorID::MOD_3_ELONG_20},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_29,TrussStructureMessage::SensorID::MOD_3_ELONG_30},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_7,TrussStructureMessage::SensorID::MOD_3_ELONG_8},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_5,TrussStructureMessage::SensorID::MOD_3_ELONG_6},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_15,TrussStructureMessage::SensorID::MOD_3_ELONG_16},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_13,TrussStructureMessage::SensorID::MOD_3_ELONG_14},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_23,TrussStructureMessage::SensorID::MOD_3_ELONG_24},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_21,TrussStructureMessage::SensorID::MOD_3_ELONG_22},
+{TrussStructureMessage::SensorID::MOD_3_ELONG_31,TrussStructureMessage::SensorID::MOD_3_ELONG_32},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_25,TrussStructureMessage::SensorID::MOD_4_ELONG_26,TrussStructureMessage::SensorID::MOD_4_ELONG_27,TrussStructureMessage::SensorID::MOD_4_ELONG_28},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_1,TrussStructureMessage::SensorID::MOD_4_ELONG_2,TrussStructureMessage::SensorID::MOD_4_ELONG_3,TrussStructureMessage::SensorID::MOD_4_ELONG_4},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_9,TrussStructureMessage::SensorID::MOD_4_ELONG_10,TrussStructureMessage::SensorID::MOD_4_ELONG_11,TrussStructureMessage::SensorID::MOD_4_ELONG_12},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_17,TrussStructureMessage::SensorID::MOD_4_ELONG_18,TrussStructureMessage::SensorID::MOD_4_ELONG_19,TrussStructureMessage::SensorID::MOD_4_ELONG_20},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_29,TrussStructureMessage::SensorID::MOD_4_ELONG_30},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_7,TrussStructureMessage::SensorID::MOD_4_ELONG_8},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_5,TrussStructureMessage::SensorID::MOD_4_ELONG_6},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_15,TrussStructureMessage::SensorID::MOD_4_ELONG_16},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_13,TrussStructureMessage::SensorID::MOD_4_ELONG_14},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_23,TrussStructureMessage::SensorID::MOD_4_ELONG_24},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_21,TrussStructureMessage::SensorID::MOD_4_ELONG_22},
+{TrussStructureMessage::SensorID::MOD_4_ELONG_31,TrussStructureMessage::SensorID::MOD_4_ELONG_32},
+{TrussStructureMessage::SensorID::CAM_1_1_SW_Z},
+{TrussStructureMessage::SensorID::CAM_2_1_SW_X},
+{TrussStructureMessage::SensorID::CAM_3_1_NW_Z},
+{TrussStructureMessage::SensorID::CAM_4_1_NW_X},
+{TrussStructureMessage::SensorID::CAM_5_2_SW_Z},
+{TrussStructureMessage::SensorID::CAM_6_2_SW_X},
+{TrussStructureMessage::SensorID::CAM_7_2_NW_Z},
+{TrussStructureMessage::SensorID::CAM_8_2_NW_X},
+{TrussStructureMessage::SensorID::CAM_9_3_SW_Z},
+{TrussStructureMessage::SensorID::CAM_10_3_SW_X},
+{TrussStructureMessage::SensorID::CAM_11_3_NW_Z},
+{TrussStructureMessage::SensorID::CAM_12_3_NW_X},
+{TrussStructureMessage::SensorID::CAM_13_4_SW_Z},
+{TrussStructureMessage::SensorID::CAM_14_4_SW_X},
+{TrussStructureMessage::SensorID::CAM_15_4_NW_Z},
+{TrussStructureMessage::SensorID::CAM_16_4_NW_X},
+{TrussStructureMessage::SensorID::CAM_17_1_NW_Z},
+{TrussStructureMessage::SensorID::CAM_18_1_NW_Y},
+{TrussStructureMessage::SensorID::CAM_19_1_NO_Z},
+{TrussStructureMessage::SensorID::CAM_20_1_NO_Y},
+{TrussStructureMessage::SensorID::CAM_21_2_NW_Z},
+{TrussStructureMessage::SensorID::CAM_22_2_NW_Y},
+{TrussStructureMessage::SensorID::CAM_23_2_NO_Z},
+{TrussStructureMessage::SensorID::CAM_24_2_NO_Y},
+{TrussStructureMessage::SensorID::CAM_25_3_NW_Z},
+{TrussStructureMessage::SensorID::CAM_26_3_NW_Y},
+{TrussStructureMessage::SensorID::CAM_27_3_NO_Z},
+{TrussStructureMessage::SensorID::CAM_28_3_NO_Y},
+{TrussStructureMessage::SensorID::CAM_29_4_NW_Z},
+{TrussStructureMessage::SensorID::CAM_30_4_NW_Y},
+{TrussStructureMessage::SensorID::CAM_31_4_NO_Z},
+{TrussStructureMessage::SensorID::CAM_32_4_NO_Y},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_1},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_2},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_3},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_4},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_5},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_6},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_7},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_8},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_9},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_10},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_11},
+{TrussStructureMessage::SensorID::MOD_1_POSENC_12},
+{TrussStructureMessage::SensorID::MOD_2_POSENC_13},
+{TrussStructureMessage::SensorID::MOD_2_POSENC_14},
+{TrussStructureMessage::SensorID::MOD_2_POSENC_15},
+{TrussStructureMessage::SensorID::MOD_2_POSENC_16},
+{TrussStructureMessage::SensorID::MOD_2_POSENC_17},
+{TrussStructureMessage::SensorID::MOD_2_POSENC_18},
+{TrussStructureMessage::SensorID::MOD_2_POSENC_19},
+{TrussStructureMessage::SensorID::MOD_2_POSENC_20},
+{TrussStructureMessage::SensorID::MOD_3_POSENC_1},
+{TrussStructureMessage::SensorID::MOD_3_POSENC_2},
+{TrussStructureMessage::SensorID::MOD_3_POSENC_3},
+{TrussStructureMessage::SensorID::MOD_3_POSENC_4},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_1_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_1_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_2_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_2_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_3_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_3_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_4_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_4_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_5_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_5_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_6_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_6_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_7_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_7_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_8_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_8_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_9_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_9_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_10_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_10_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_11_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_11_Y},
+{TrussStructureMessage::SensorID::MOD_1_PRESSURE_12_X,TrussStructureMessage::SensorID::MOD_1_PRESSURE_12_Y},
+{TrussStructureMessage::SensorID::MOD_2_PRESSURE_13_X,TrussStructureMessage::SensorID::MOD_2_PRESSURE_13_Y},
+{TrussStructureMessage::SensorID::MOD_2_PRESSURE_14_X,TrussStructureMessage::SensorID::MOD_2_PRESSURE_14_Y},
+{TrussStructureMessage::SensorID::MOD_2_PRESSURE_15_X,TrussStructureMessage::SensorID::MOD_2_PRESSURE_15_Y},
+{TrussStructureMessage::SensorID::MOD_2_PRESSURE_16_X,TrussStructureMessage::SensorID::MOD_2_PRESSURE_16_Y},
+{TrussStructureMessage::SensorID::MOD_2_PRESSURE_17_X,TrussStructureMessage::SensorID::MOD_2_PRESSURE_17_Y},
+{TrussStructureMessage::SensorID::MOD_2_PRESSURE_18_X,TrussStructureMessage::SensorID::MOD_2_PRESSURE_18_Y},
+{TrussStructureMessage::SensorID::MOD_2_PRESSURE_19_X,TrussStructureMessage::SensorID::MOD_2_PRESSURE_19_Y},
+{TrussStructureMessage::SensorID::MOD_2_PRESSURE_20_X,TrussStructureMessage::SensorID::MOD_2_PRESSURE_20_Y},
+{TrussStructureMessage::SensorID::MOD_3_PRESSURE_21X,TrussStructureMessage::SensorID::MOD_3_PRESSURE_21Y},
+{TrussStructureMessage::SensorID::MOD_3_PRESSURE_22X,TrussStructureMessage::SensorID::MOD_3_PRESSURE_22Y},
+{TrussStructureMessage::SensorID::MOD_3_PRESSURE_23X,TrussStructureMessage::SensorID::MOD_3_PRESSURE_23Y},
+{TrussStructureMessage::SensorID::MOD_3_PRESSURE_24X,TrussStructureMessage::SensorID::MOD_3_PRESSURE_24Y}
+
+            });
+
+        return sensor_ids[fault_class];
+    }
+
+    struct RawData {
+        double InternalFormat[fault_channel_cnt];
+    };
+};
+
 enum class HoloLensOperatorID : uint8_t {
-    OPERATOR_0    = 0,
-    OPERATOR_1    = 1,
-    OPERATOR_2    = 2,
-    OPERATOR_3    = 3,
+    OPERATOR_0 = 0,
+    OPERATOR_1 = 1,
+    OPERATOR_2 = 2,
+    OPERATOR_3 = 3,
     ALL_OPERATORS = 255
 };
 
@@ -801,7 +951,7 @@ struct OperatorPoseMessage {
     static constexpr std::string envelope() { return "OP"; }
 
     static constexpr std::array<float, 2> getFov() {
-        return {43.0,29.0};
+        return { 43.0,29.0 };
     }
 
     struct RawData
