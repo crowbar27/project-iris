@@ -115,7 +115,7 @@ public:
 
             auto wsaClean = wil::scope_exit([](void) {
                 ::WSACleanup();
-                });
+            });
 
             std::array<iris::receive_context, 2> receivers{
                 iris::receive_context(iris::d1244BroadcastPorts()[0], {iris::d1244BroadcastIps()[0], iris::d1244BroadcastIps()[1], iris::d1244BroadcastIps()[2], iris::d1244BroadcastIps()[3], iris::d1244BroadcastIps()[4]}),
@@ -123,9 +123,9 @@ public:
             };
 
             std::array<wil::unique_event, receivers.size()> events;
-            std::for_each(events.begin(), events.end(), [](wil::unique_event& e) {
+            std::for_each(events.begin(), events.end(), [](wil::unique_event &e) {
                 e.create(wil::EventOptions::ManualReset);
-                });
+            });
             for (std::size_t i = 0; i < events.size(); ++i) {
                 receivers[i].overlapped.hEvent = events[i].get();
             }
@@ -136,6 +136,11 @@ public:
             auto t_0 = std::chrono::high_resolution_clock::now();
             auto elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
             is_running_ = true;
+
+            if (!use_local_data_)
+                // Post initial receive on all sockets.
+                iris::post_receive(WSARecvMsg, receivers.begin(), receivers.end());
+            }
 
             while (is_running_) {
 
@@ -148,27 +153,13 @@ public:
 
                     while (!recv_complete)
                     {
-                        for (auto& r : receivers) {
-                            auto status = WSARecvMsg(r.socket.get(),
-                                &r.message,
-                                nullptr,
-                                &r.overlapped,
-                                nullptr);
-                            if (status == SOCKET_ERROR) {
-                                auto error = ::WSAGetLastError();
-                                if (error != WSA_IO_PENDING) {
-                                    throw std::system_error(::WSAGetLastError(), std::system_category());
-                                }
-                            }
-                        }
-
                         auto status = ::WSAWaitForMultipleEvents(static_cast<DWORD>(events.size()),
                             reinterpret_cast<HANDLE*>(events.data()), FALSE, INFINITE, FALSE);
                         switch (status) {
-                        case WSA_WAIT_FAILED:
-                            throw std::system_error(::WSAGetLastError(), std::system_category());
-                        case WSA_WAIT_TIMEOUT:
-                            continue;
+                            case WSA_WAIT_FAILED:
+                                throw std::system_error(::WSAGetLastError(), std::system_category());
+                            case WSA_WAIT_TIMEOUT:
+                                continue;
                         }
 
                         auto r = status - WSA_WAIT_EVENT_0;
@@ -210,6 +201,9 @@ public:
                             std::memcpy(&recv_message.data[static_cast<size_t>(TrussStructureMessage::SensorID::CAM_2_NUMVARS)], receiver.received.data(), receiver.received.size());
                             recv_parts[5] = true;
                         }
+
+                        // Post the next receive on the socket that just had data.
+                        iris::post_receive(WSARecvMsg, receiver);
 
                         // check if all parts of a truss strcuture sensor message have been collected
                         recv_complete = true;
