@@ -186,6 +186,35 @@ namespace iris {
         receive_context& operator =(receive_context&&) = default;
     };
 
+    /// <summary>
+    /// Posts an asynchronous <paramref name="receive" /> operation on the
+    /// socket of the given <see cref="receive_context" />.
+    /// </summary>
+    inline void post_receive(LPFN_WSARECVMSG receive, receive_context& r) {
+        auto status = receive(r.socket.get(),
+            &r.message,
+            nullptr,
+            &r.overlapped,
+            nullptr);
+        if (status == SOCKET_ERROR) {
+            auto error = ::WSAGetLastError();
+            if (error != WSA_IO_PENDING) {
+                throw std::system_error(::WSAGetLastError(), std::system_category());
+            }
+        }
+    }
+
+    /// <summary>
+    /// Iterates over a range of <see cref="receive_context" />s and posts a
+    /// an asynchronous <paramref name="receive" /> message operation on each
+    /// of the respective sockets.
+    /// </summary>
+    template<class TIterator>
+    void post_receive(LPFN_WSARECVMSG receive, TIterator begin, TIterator end) {
+        for (auto it = begin; it != end; ++it) {
+            post_receive(receive, *it);
+        }
+    }
 
     /// <summary>
     /// Sends datagrams with very useful data to 225.1.1.1, 226.1.1.1, 227.1.1.1
