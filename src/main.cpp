@@ -137,7 +137,7 @@ public:
             auto elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
             is_running_ = true;
 
-            if (!use_local_data_)
+            if (!use_local_data_) {
                 // Post initial receive on all sockets.
                 iris::post_receive(WSARecvMsg, receivers.begin(), receivers.end());
             }
