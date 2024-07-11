@@ -3,6 +3,7 @@
 
 #include <array>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct TrussStructureMessage {
@@ -773,6 +774,300 @@ struct TrussStructureMessage {
         );
 
         return sensor_types[id];
+    }
+
+    static SensorID getSensorID(std::string const& sensor_label) {
+        static const std::unordered_map<std::string_view, SensorID> label_to_id = {
+            {"mod_1_numvars",SensorID::MOD_1_NUMVARS},
+            {"mod_1_timestamp",SensorID::MOD_1_TIMESTAMP},
+            {"mod_1_elong_1",SensorID::MOD_1_ELONG_1},
+            {"mod_1_elong_2",SensorID::MOD_1_ELONG_2},
+            {"mod_1_elong_3",SensorID::MOD_1_ELONG_3},
+            {"mod_1_elong_4",SensorID::MOD_1_ELONG_4},
+            {"mod_1_elong_5",SensorID::MOD_1_ELONG_5},
+            {"mod_1_elong_6",SensorID::MOD_1_ELONG_6},
+            {"mod_1_elong_7",SensorID::MOD_1_ELONG_7},
+            {"mod_1_elong_8",SensorID::MOD_1_ELONG_8},
+            {"mod_1_elong_9",SensorID::MOD_1_ELONG_9},
+            {"mod_1_elong_10",SensorID::MOD_1_ELONG_10},
+            {"mod_1_elong_11",SensorID::MOD_1_ELONG_11},
+            {"mod_1_elong_12",SensorID::MOD_1_ELONG_12},
+            {"mod_1_elong_13",SensorID::MOD_1_ELONG_13},
+            {"mod_1_elong_14",SensorID::MOD_1_ELONG_14},
+            {"mod_1_elong_15",SensorID::MOD_1_ELONG_15},
+            {"mod_1_elong_16",SensorID::MOD_1_ELONG_16},
+            {"mod_1_elong_17",SensorID::MOD_1_ELONG_17},
+            {"mod_1_elong_18",SensorID::MOD_1_ELONG_18},
+            {"mod_1_elong_19",SensorID::MOD_1_ELONG_19},
+            {"mod_1_elong_20",SensorID::MOD_1_ELONG_20},
+            {"mod_1_elong_21",SensorID::MOD_1_ELONG_21},
+            {"mod_1_elong_22",SensorID::MOD_1_ELONG_22},
+            {"mod_1_elong_23",SensorID::MOD_1_ELONG_23},
+            {"mod_1_elong_24",SensorID::MOD_1_ELONG_24},
+            {"mod_1_elong_25",SensorID::MOD_1_ELONG_25},
+            {"mod_1_elong_26",SensorID::MOD_1_ELONG_26},
+            {"mod_1_elong_27",SensorID::MOD_1_ELONG_27},
+            {"mod_1_elong_28",SensorID::MOD_1_ELONG_28},
+            {"mod_1_elong_29",SensorID::MOD_1_ELONG_29},
+            {"mod_1_elong_30",SensorID::MOD_1_ELONG_30},
+            {"mod_1_elong_31",SensorID::MOD_1_ELONG_31},
+            {"mod_1_elong_32",SensorID::MOD_1_ELONG_32},
+            {"mod_1_pressure_1_x",SensorID::MOD_1_PRESSURE_1_X},
+            {"mod_1_pressure_1_y",SensorID::MOD_1_PRESSURE_1_Y},
+            {"mod_1_pressure_2_x",SensorID::MOD_1_PRESSURE_2_X},
+            {"mod_1_pressure_2_y",SensorID::MOD_1_PRESSURE_2_Y},
+            {"mod_1_pressure_3_x",SensorID::MOD_1_PRESSURE_3_X},
+            {"mod_1_pressure_3_y",SensorID::MOD_1_PRESSURE_3_Y},
+            {"mod_1_pressure_4_x",SensorID::MOD_1_PRESSURE_4_X},
+            {"mod_1_pressure_4_y",SensorID::MOD_1_PRESSURE_4_Y},
+            {"mod_1_pressure_5_x",SensorID::MOD_1_PRESSURE_5_X},
+            {"mod_1_pressure_5_y",SensorID::MOD_1_PRESSURE_5_Y},
+            {"mod_1_pressure_6_x",SensorID::MOD_1_PRESSURE_6_X},
+            {"mod_1_pressure_6_y",SensorID::MOD_1_PRESSURE_6_Y},
+            {"mod_1_pressure_7_x",SensorID::MOD_1_PRESSURE_7_X},
+            {"mod_1_pressure_7_y",SensorID::MOD_1_PRESSURE_7_Y},
+            {"mod_1_pressure_8_x",SensorID::MOD_1_PRESSURE_8_X},
+            {"mod_1_pressure_8_y",SensorID::MOD_1_PRESSURE_8_Y},
+            {"mod_1_pressure_9_x",SensorID::MOD_1_PRESSURE_9_X},
+            {"mod_1_pressure_9_y",SensorID::MOD_1_PRESSURE_9_Y},
+            {"mod_1_pressure_10_x",SensorID::MOD_1_PRESSURE_10_X},
+            {"mod_1_pressure_10_y",SensorID::MOD_1_PRESSURE_10_Y},
+            {"mod_1_pressure_11_x",SensorID::MOD_1_PRESSURE_11_X},
+            {"mod_1_pressure_11_y",SensorID::MOD_1_PRESSURE_11_Y},
+            {"mod_1_pressure_12_x",SensorID::MOD_1_PRESSURE_12_X},
+            {"mod_1_pressure_12_y",SensorID::MOD_1_PRESSURE_12_Y},
+            {"mod_1_posenc_1",SensorID::MOD_1_POSENC_1},
+            {"mod_1_posenc_2",SensorID::MOD_1_POSENC_2},
+            {"mod_1_posenc_3",SensorID::MOD_1_POSENC_3},
+            {"mod_1_posenc_4",SensorID::MOD_1_POSENC_4},
+            {"mod_1_posenc_5",SensorID::MOD_1_POSENC_5},
+            {"mod_1_posenc_6",SensorID::MOD_1_POSENC_6},
+            {"mod_1_posenc_7",SensorID::MOD_1_POSENC_7},
+            {"mod_1_posenc_8",SensorID::MOD_1_POSENC_8},
+            {"mod_1_posenc_9",SensorID::MOD_1_POSENC_9},
+            {"mod_1_posenc_10",SensorID::MOD_1_POSENC_10},
+            {"mod_1_posenc_11",SensorID::MOD_1_POSENC_11},
+            {"mod_1_posenc_12",SensorID::MOD_1_POSENC_12},
+            {"mod_2_numvars",SensorID::MOD_2_NUMVARS},
+            {"mod_2_timestamp",SensorID::MOD_2_TIMESTAMP},
+            {"mod_2_elong_1",SensorID::MOD_2_ELONG_1},
+            {"mod_2_elong_2",SensorID::MOD_2_ELONG_2},
+            {"mod_2_elong_3",SensorID::MOD_2_ELONG_3},
+            {"mod_2_elong_4",SensorID::MOD_2_ELONG_4},
+            {"mod_2_elong_5",SensorID::MOD_2_ELONG_5},
+            {"mod_2_elong_6",SensorID::MOD_2_ELONG_6},
+            {"mod_2_elong_7",SensorID::MOD_2_ELONG_7},
+            {"mod_2_elong_8",SensorID::MOD_2_ELONG_8},
+            {"mod_2_elong_9",SensorID::MOD_2_ELONG_9},
+            {"mod_2_elong_10",SensorID::MOD_2_ELONG_10},
+            {"mod_2_elong_11",SensorID::MOD_2_ELONG_11},
+            {"mod_2_elong_12",SensorID::MOD_2_ELONG_12},
+            {"mod_2_elong_13",SensorID::MOD_2_ELONG_13},
+            {"mod_2_elong_14",SensorID::MOD_2_ELONG_14},
+            {"mod_2_elong_15",SensorID::MOD_2_ELONG_15},
+            {"mod_2_elong_16",SensorID::MOD_2_ELONG_16},
+            {"mod_2_elong_17",SensorID::MOD_2_ELONG_17},
+            {"mod_2_elong_18",SensorID::MOD_2_ELONG_18},
+            {"mod_2_elong_19",SensorID::MOD_2_ELONG_19},
+            {"mod_2_elong_20",SensorID::MOD_2_ELONG_20},
+            {"mod_2_elong_21",SensorID::MOD_2_ELONG_21},
+            {"mod_2_elong_22",SensorID::MOD_2_ELONG_22},
+            {"mod_2_elong_23",SensorID::MOD_2_ELONG_23},
+            {"mod_2_elong_24",SensorID::MOD_2_ELONG_24},
+            {"mod_2_elong_25",SensorID::MOD_2_ELONG_25},
+            {"mod_2_elong_26",SensorID::MOD_2_ELONG_26},
+            {"mod_2_elong_27",SensorID::MOD_2_ELONG_27},
+            {"mod_2_elong_28",SensorID::MOD_2_ELONG_28},
+            {"mod_2_elong_29",SensorID::MOD_2_ELONG_29},
+            {"mod_2_elong_30",SensorID::MOD_2_ELONG_30},
+            {"mod_2_elong_31",SensorID::MOD_2_ELONG_31},
+            {"mod_2_elong_32",SensorID::MOD_2_ELONG_32},
+            {"mod_2_pressure_13_x",SensorID::MOD_2_PRESSURE_13_X},
+            {"mod_2_pressure_13_y",SensorID::MOD_2_PRESSURE_13_Y},
+            {"mod_2_pressure_14_x",SensorID::MOD_2_PRESSURE_14_X},
+            {"mod_2_pressure_14_y",SensorID::MOD_2_PRESSURE_14_Y},
+            {"mod_2_pressure_15_x",SensorID::MOD_2_PRESSURE_15_X},
+            {"mod_2_pressure_15_y",SensorID::MOD_2_PRESSURE_15_Y},
+            {"mod_2_pressure_16_x",SensorID::MOD_2_PRESSURE_16_X},
+            {"mod_2_pressure_16_y",SensorID::MOD_2_PRESSURE_16_Y},
+            {"mod_2_pressure_17_x",SensorID::MOD_2_PRESSURE_17_X},
+            {"mod_2_pressure_17_y",SensorID::MOD_2_PRESSURE_17_Y},
+            {"mod_2_pressure_18_x",SensorID::MOD_2_PRESSURE_18_X},
+            {"mod_2_pressure_18_y",SensorID::MOD_2_PRESSURE_18_Y},
+            {"mod_2_pressure_19_x",SensorID::MOD_2_PRESSURE_19_X},
+            {"mod_2_pressure_19_y",SensorID::MOD_2_PRESSURE_19_Y},
+            {"mod_2_pressure_20_x",SensorID::MOD_2_PRESSURE_20_X},
+            {"mod_2_pressure_20_y",SensorID::MOD_2_PRESSURE_20_Y},
+            {"mod_2_posenc_13",SensorID::MOD_2_POSENC_13},
+            {"mod_2_posenc_14",SensorID::MOD_2_POSENC_14},
+            {"mod_2_posenc_15",SensorID::MOD_2_POSENC_15},
+            {"mod_2_posenc_16",SensorID::MOD_2_POSENC_16},
+            {"mod_2_posenc_17",SensorID::MOD_2_POSENC_17},
+            {"mod_2_posenc_18",SensorID::MOD_2_POSENC_18},
+            {"mod_2_posenc_19",SensorID::MOD_2_POSENC_19},
+            {"mod_2_posenc_20",SensorID::MOD_2_POSENC_20},
+            {"mod_3_numvars",SensorID::MOD_3_NUMVARS},
+            {"mod_3_timestamp",SensorID::MOD_3_TIMESTAMP},
+            {"mod_3_elong_1",SensorID::MOD_3_ELONG_1},
+            {"mod_3_elong_2",SensorID::MOD_3_ELONG_2},
+            {"mod_3_elong_3",SensorID::MOD_3_ELONG_3},
+            {"mod_3_elong_4",SensorID::MOD_3_ELONG_4},
+            {"mod_3_elong_5",SensorID::MOD_3_ELONG_5},
+            {"mod_3_elong_6",SensorID::MOD_3_ELONG_6},
+            {"mod_3_elong_7",SensorID::MOD_3_ELONG_7},
+            {"mod_3_elong_8",SensorID::MOD_3_ELONG_8},
+            {"mod_3_elong_9",SensorID::MOD_3_ELONG_9},
+            {"mod_3_elong_10",SensorID::MOD_3_ELONG_10},
+            {"mod_3_elong_11",SensorID::MOD_3_ELONG_11},
+            {"mod_3_elong_12",SensorID::MOD_3_ELONG_12},
+            {"mod_3_elong_13",SensorID::MOD_3_ELONG_13},
+            {"mod_3_elong_14",SensorID::MOD_3_ELONG_14},
+            {"mod_3_elong_15",SensorID::MOD_3_ELONG_15},
+            {"mod_3_elong_16",SensorID::MOD_3_ELONG_16},
+            {"mod_3_elong_17",SensorID::MOD_3_ELONG_17},
+            {"mod_3_elong_18",SensorID::MOD_3_ELONG_18},
+            {"mod_3_elong_19",SensorID::MOD_3_ELONG_19},
+            {"mod_3_elong_20",SensorID::MOD_3_ELONG_20},
+            {"mod_3_elong_21",SensorID::MOD_3_ELONG_21},
+            {"mod_3_elong_22",SensorID::MOD_3_ELONG_22},
+            {"mod_3_elong_23",SensorID::MOD_3_ELONG_23},
+            {"mod_3_elong_24",SensorID::MOD_3_ELONG_24},
+            {"mod_3_elong_25",SensorID::MOD_3_ELONG_25},
+            {"mod_3_elong_26",SensorID::MOD_3_ELONG_26},
+            {"mod_3_elong_27",SensorID::MOD_3_ELONG_27},
+            {"mod_3_elong_28",SensorID::MOD_3_ELONG_28},
+            {"mod_3_elong_29",SensorID::MOD_3_ELONG_29},
+            {"mod_3_elong_30",SensorID::MOD_3_ELONG_30},
+            {"mod_3_elong_31",SensorID::MOD_3_ELONG_31},
+            {"mod_3_elong_32",SensorID::MOD_3_ELONG_32},
+            {"mod_3_pressure_21x",SensorID::MOD_3_PRESSURE_21X},
+            {"mod_3_pressure_21y",SensorID::MOD_3_PRESSURE_21Y},
+            {"mod_3_pressure_22x",SensorID::MOD_3_PRESSURE_22X},
+            {"mod_3_pressure_22y",SensorID::MOD_3_PRESSURE_22Y},
+            {"mod_3_pressure_23x",SensorID::MOD_3_PRESSURE_23X},
+            {"mod_3_pressure_23y",SensorID::MOD_3_PRESSURE_23Y},
+            {"mod_3_pressure_24x",SensorID::MOD_3_PRESSURE_24X},
+            {"mod_3_pressure_24y",SensorID::MOD_3_PRESSURE_24Y},
+            {"mod_3_posenc_1",SensorID::MOD_3_POSENC_1},
+            {"mod_3_posenc_2",SensorID::MOD_3_POSENC_2},
+            {"mod_3_posenc_3",SensorID::MOD_3_POSENC_3},
+            {"mod_3_posenc_4",SensorID::MOD_3_POSENC_4},
+            {"mod_4_numvars",SensorID::MOD_4_NUMVARS},
+            {"mod_4_timestamp",SensorID::MOD_4_TIMESTAMP},
+            {"mod_4_elong_1",SensorID::MOD_4_ELONG_1},
+            {"mod_4_elong_2",SensorID::MOD_4_ELONG_2},
+            {"mod_4_elong_3",SensorID::MOD_4_ELONG_3},
+            {"mod_4_elong_4",SensorID::MOD_4_ELONG_4},
+            {"mod_4_elong_5",SensorID::MOD_4_ELONG_5},
+            {"mod_4_elong_6",SensorID::MOD_4_ELONG_6},
+            {"mod_4_elong_7",SensorID::MOD_4_ELONG_7},
+            {"mod_4_elong_8",SensorID::MOD_4_ELONG_8},
+            {"mod_4_elong_9",SensorID::MOD_4_ELONG_9},
+            {"mod_4_elong_10",SensorID::MOD_4_ELONG_10},
+            {"mod_4_elong_11",SensorID::MOD_4_ELONG_11},
+            {"mod_4_elong_12",SensorID::MOD_4_ELONG_12},
+            {"mod_4_elong_13",SensorID::MOD_4_ELONG_13},
+            {"mod_4_elong_14",SensorID::MOD_4_ELONG_14},
+            {"mod_4_elong_15",SensorID::MOD_4_ELONG_15},
+            {"mod_4_elong_16",SensorID::MOD_4_ELONG_16},
+            {"mod_4_elong_17",SensorID::MOD_4_ELONG_17},
+            {"mod_4_elong_18",SensorID::MOD_4_ELONG_18},
+            {"mod_4_elong_19",SensorID::MOD_4_ELONG_19},
+            {"mod_4_elong_20",SensorID::MOD_4_ELONG_20},
+            {"mod_4_elong_21",SensorID::MOD_4_ELONG_21},
+            {"mod_4_elong_22",SensorID::MOD_4_ELONG_22},
+            {"mod_4_elong_23",SensorID::MOD_4_ELONG_23},
+            {"mod_4_elong_24",SensorID::MOD_4_ELONG_24},
+            {"mod_4_elong_25",SensorID::MOD_4_ELONG_25},
+            {"mod_4_elong_26",SensorID::MOD_4_ELONG_26},
+            {"mod_4_elong_27",SensorID::MOD_4_ELONG_27},
+            {"mod_4_elong_28",SensorID::MOD_4_ELONG_28},
+            {"mod_4_elong_29",SensorID::MOD_4_ELONG_29},
+            {"mod_4_elong_30",SensorID::MOD_4_ELONG_30},
+            {"mod_4_elong_31",SensorID::MOD_4_ELONG_31},
+            {"mod_4_elong_32",SensorID::MOD_4_ELONG_32},
+            {"cam_1_numvars",SensorID::CAM_1_NUMVARS},
+            {"cam_1_timestamp",SensorID::CAM_1_TIMESTAMP},
+            {"cam_1_1_sw_z",SensorID::CAM_1_1_SW_Z},
+            {"cam_2_1_sw_x",SensorID::CAM_2_1_SW_X},
+            {"cam_3_1_nw_z",SensorID::CAM_3_1_NW_Z},
+            {"cam_4_1_nw_x",SensorID::CAM_4_1_NW_X},
+            {"cam_5_2_sw_z",SensorID::CAM_5_2_SW_Z},
+            {"cam_6_2_sw_x",SensorID::CAM_6_2_SW_X},
+            {"cam_7_2_nw_z",SensorID::CAM_7_2_NW_Z},
+            {"cam_8_2_nw_x",SensorID::CAM_8_2_NW_X},
+            {"cam_9_3_sw_z",SensorID::CAM_9_3_SW_Z},
+            {"cam_10_3_sw_x",SensorID::CAM_10_3_SW_X},
+            {"cam_11_3_nw_z",SensorID::CAM_11_3_NW_Z},
+            {"cam_12_3_nw_x",SensorID::CAM_12_3_NW_X},
+            {"cam_13_4_sw_z",SensorID::CAM_13_4_SW_Z},
+            {"cam_14_4_sw_x",SensorID::CAM_14_4_SW_X},
+            {"cam_15_4_nw_z",SensorID::CAM_15_4_NW_Z},
+            {"cam_16_4_nw_x",SensorID::CAM_16_4_NW_X},
+            {"cam_2_numvars",SensorID::CAM_2_NUMVARS},
+            {"cam_2_timestamp",SensorID::CAM_2_TIMESTAMP},
+            {"cam_17_1_nw_z",SensorID::CAM_17_1_NW_Z},
+            {"cam_18_1_nw_y",SensorID::CAM_18_1_NW_Y},
+            {"cam_19_1_no_z",SensorID::CAM_19_1_NO_Z},
+            {"cam_20_1_no_y",SensorID::CAM_20_1_NO_Y},
+            {"cam_21_2_nw_z",SensorID::CAM_21_2_NW_Z},
+            {"cam_22_2_nw_y",SensorID::CAM_22_2_NW_Y},
+            {"cam_23_2_no_z",SensorID::CAM_23_2_NO_Z},
+            {"cam_24_2_no_y",SensorID::CAM_24_2_NO_Y},
+            {"cam_25_3_nw_z",SensorID::CAM_25_3_NW_Z},
+            {"cam_26_3_nw_y",SensorID::CAM_26_3_NW_Y},
+            {"cam_27_3_no_z",SensorID::CAM_27_3_NO_Z},
+            {"cam_28_3_no_y",SensorID::CAM_28_3_NO_Y},
+            {"cam_29_4_nw_z",SensorID::CAM_29_4_NW_Z},
+            {"cam_30_4_nw_y",SensorID::CAM_30_4_NW_Y},
+            {"cam_31_4_no_z",SensorID::CAM_31_4_NO_Z},
+            {"cam_32_4_no_y",SensorID::CAM_32_4_NO_Y}
+        };
+
+        SensorID retval;
+        auto query = label_to_id.find(sensor_label);
+
+        if (query != label_to_id.end()) {
+            retval = query->second;
+        }
+        else
+        {
+            //TODO fail
+        }
+
+        return retval;
+    }
+
+    static SensorID getSensorTimestamp(SensorID sensor_id) {
+        size_t sid = static_cast<size_t>(sensor_id);
+
+        if(sid >= 0 && sid <= 69)
+        {
+            return SensorID::MOD_1_TIMESTAMP;
+        }
+        else if (sid >= 70 && sid <= 127)
+        {
+            return SensorID::MOD_2_TIMESTAMP;
+        }
+        else if (sid >= 128 && sid <= 173)
+        {
+            return SensorID::MOD_3_TIMESTAMP;
+        }
+        else if (sid >= 174 && sid <= 207)
+        {
+            return SensorID::MOD_4_TIMESTAMP;
+        }
+        else if (sid >= 208 && sid <= 225)
+        {
+            return SensorID::CAM_1_TIMESTAMP;
+        }
+        else if (sid >= 226 && sid <= 243)
+        {
+            return SensorID::CAM_2_TIMESTAMP;
+        }
+        else {
+            return SensorID::MOD_1_TIMESTAMP; // should never be reached
+        }
     }
 
     struct RawSensorData
