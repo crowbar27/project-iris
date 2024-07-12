@@ -1079,6 +1079,8 @@ struct TrussStructureMessage {
 
 };
 
+// Representation of a truss structure sensor fault message
+// Currently only the tranlation from fault class to sensor is used to send event messages
 struct TrussStructureFaultMessage {
     typedef double InternalFormat;
 
@@ -1267,7 +1269,8 @@ namespace EventMessages {
         SHOW_PLOT,
         SHOW_TEXT,
         REQUEST_RESPONSE,
-        SEND_RESPONSE
+        SEND_RESPONSE,
+        SENSOR_FAULT
     };
 
     enum class Receiver {
@@ -1279,7 +1282,7 @@ namespace EventMessages {
         std::string prefix = rcvr == Receiver::HOLOLENS ? "HL_" : "UE_";
         std::string event = "unknown";
 
-        const size_t event_cnt = 8;
+        const size_t event_cnt = 9;
         std::string event_codes[event_cnt] = {
             "ping",
             "here",
@@ -1288,7 +1291,8 @@ namespace EventMessages {
             "show_plot",
             "show_text",
             "request_response",
-            "send_response"
+            "send_response",
+            "sensor_fault"
         };
 
         const size_t index = static_cast<size_t>(evt_type);
@@ -1397,6 +1401,14 @@ namespace EventMessages {
         {}
     };
 
+    struct SensorFaultEventRawData {
+        TrussStructureMessage::SensorID sensor_id;
+
+        SensorFaultEventRawData(TrussStructureMessage::SensorID sensor_id)
+            : sensor_id(sensor_id)
+        {}
+    };
+
     using PingEventMessage = BaseEventMessage<OperatorIdRawData, EventType::PING>;
 
     using HereEventMessage = BaseEventMessage<HereEventRawData, EventType::HERE>;
@@ -1412,6 +1424,8 @@ namespace EventMessages {
     using RequestResponseEventMessage = BaseEventMessage<ResponseEventRawData, EventType::REQUEST_RESPONSE>;
 
     using SendResponseEventMessage = BaseEventMessage<ResponseEventRawData, EventType::SEND_RESPONSE>;
+
+    using SensorFaultEventMessage = BaseEventMessage<SensorFaultEventRawData, EventType::SENSOR_FAULT>;
 }
 
 
