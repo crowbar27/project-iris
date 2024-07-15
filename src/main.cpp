@@ -121,6 +121,10 @@ public:
                 iris::receive_context(iris::d1244BroadcastPorts()[0], {iris::d1244BroadcastIps()[0], iris::d1244BroadcastIps()[1], iris::d1244BroadcastIps()[2], iris::d1244BroadcastIps()[3], iris::d1244BroadcastIps()[4]}),
                 iris::receive_context(iris::d1244BroadcastPorts()[5], {iris::d1244BroadcastIps()[5]}),
             };
+            //std::array<iris::receive_context, 1> receivers{
+            //        iris::receive_context(4321, {"226.1.1.1"})
+            //    //    iris::receive_context(iris::d1244BroadcastPorts()[5], {iris::d1244BroadcastIps()[5]}),
+            //    };
 
             std::array<wil::unique_event, receivers.size()> events;
             std::for_each(events.begin(), events.end(), [](wil::unique_event &e) {
@@ -137,10 +141,10 @@ public:
             auto elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
             is_running_ = true;
 
-            if (!use_local_data_) {
+            //if (!use_local_data_) {
                 // Post initial receive on all sockets.
                 iris::post_receive(WSARecvMsg, receivers.begin(), receivers.end());
-            }
+            //}
 
             while (is_running_) {
 
@@ -685,6 +689,37 @@ struct EventServer {
 
         std::vector<zmq::pollitem_t> items = { {subscriber, 0, ZMQ_POLLIN, 0 } };
 
+
+        // Setup UDP broadcast receive of sensor faults
+        // Init live data receiving
+        std::array<char, 64> group;
+        WSADATA wsaData{ 0 };
+
+        if (::WSAStartup(MAKEWORD(2, 2), &wsaData) == SOCKET_ERROR) {
+            throw std::system_error(::WSAGetLastError(), std::system_category());
+        }
+
+        auto wsaClean = wil::scope_exit([](void) {
+            ::WSACleanup();
+            });
+
+        std::array<iris::receive_context, 1> receivers{
+            iris::receive_context(iris::d1244BroadcastPort_SensorFaults(), { iris::d1244BroadcastIp_SensorFaults() })
+        };
+
+        std::array<wil::unique_event, receivers.size()> events;
+        std::for_each(events.begin(), events.end(), [](wil::unique_event& e) {
+            e.create(wil::EventOptions::ManualReset);
+            });
+        for (std::size_t i = 0; i < events.size(); ++i) {
+            receivers[i].overlapped.hEvent = events[i].get();
+        }
+
+        const auto WSARecvMsg = iris::get_wsa_recv_msg(receivers.front().socket);
+
+        iris::post_receive(WSARecvMsg, receivers.begin(), receivers.end());
+
+        // start sending/receiving
         auto t_0 = std::chrono::high_resolution_clock::now();
         auto elapsed_time =
             std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
@@ -696,7 +731,37 @@ struct EventServer {
             elapsed_time =
                 std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - t_0).count();
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            // Send message from queue (basically a debug feature to spawn messages from the server)
+            while (!send_message_queue_.empty())
+            {
+                auto const& msg = send_message_queue_.front();
+
+                switch (msg.first)
+                {
+                case EventMessages::EventType::SEND_RESPONSE:
+                    publisher.send(zmq::message_t(
+                        EventMessages::envelope(EventMessages::Receiver::UNREAL, EventMessages::EventType::SEND_RESPONSE).data(),
+                        EventMessages::envelope(EventMessages::Receiver::UNREAL, EventMessages::EventType::SEND_RESPONSE).size()),
+                        zmq::send_flags::sndmore
+                    );
+                    publisher.send(zmq::message_t(msg.second.get(), sizeof(EventMessages::ResponseEventRawData)));
+                    break;
+                    //TODO cover all (relevant) cases
+                case EventMessages::EventType::SENSOR_FAULT:
+                    publisher.send(zmq::message_t(
+                        EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SENSOR_FAULT).data(),
+                        EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SENSOR_FAULT).size()),
+                        zmq::send_flags::sndmore
+                    );
+                    publisher.send(zmq::message_t(msg.second.get(), sizeof(EventMessages::SensorFaultEventRawData)));
+                    break;
+                    //TODO cover all (relevant) cases
+                default:
+                    break;
+                }
+                send_message_queue_.pop();
+                //TODO add inserted message to UI display?
+            }
 
             // Poll for incoming messages with 100ms timeout
             zmq::poll(items, 100);
@@ -828,28 +893,43 @@ struct EventServer {
                 // Forward events
                 publisher.send(recv_msgs[0], zmq::send_flags::sndmore);
                 publisher.send(recv_msgs[1]);
+            }
 
-                // Send message from queue (basically a debug feature to spawn messages from the server)
-                while (!send_message_queue_.empty())
-                {
-                    auto const& msg = send_message_queue_.front();
+            // TODO receive sensor faults from udp broadcast
+            {
+                auto status = ::WSAWaitForMultipleEvents(static_cast<DWORD>(events.size()),
+                    reinterpret_cast<HANDLE*>(events.data()), FALSE, 8, FALSE);
+                switch (status) {
+                case WSA_WAIT_FAILED:
+                    throw std::system_error(::WSAGetLastError(), std::system_category());
+                case WSA_WAIT_TIMEOUT:
+                    continue;
+                }
 
-                    switch (msg.first)
-                    {
-                    case EventMessages::EventType::SEND_RESPONSE:
-                        publisher.send(zmq::message_t(
-                            EventMessages::envelope(EventMessages::Receiver::UNREAL, EventMessages::EventType::SEND_RESPONSE).data(),
-                            EventMessages::envelope(EventMessages::Receiver::UNREAL, EventMessages::EventType::SEND_RESPONSE).size()),
-                            zmq::send_flags::sndmore
-                        );
-                        publisher.send(zmq::message_t(msg.second.get(), sizeof(EventMessages::ResponseEventRawData)));
-                        break;
-                        //TODO cover all (relevant) cases
-                    default:
-                        break;
-                    }
+                auto r = status - WSA_WAIT_EVENT_0;
+                auto& receiver = receivers[r];
+                auto pkt_info = iris::get_packet_info(receiver.message);
+                assert(pkt_info != nullptr);
+                std::string dest_ip = ::inet_ntop(AF_INET, &pkt_info->ipi_addr, group.data(), group.size());
+                std::cout << "Received via " << dest_ip << std::endl;
+                receiver.message.dwFlags = 0;
+                events[r].ResetEvent();
 
-                    //TODO add inserted message to UI display?
+                int fault_class = reinterpret_cast<int*>(receiver.received.data())[1];
+
+                // Post the next receive on the socket that just had data.
+                iris::post_receive(WSARecvMsg, receiver);
+
+                // forward message to zmq subscribers
+                auto sensor_ids = TrussStructureFaultMessage::getSensorIDs(fault_class);
+                for (auto& sensor_id : sensor_ids) {
+                    EventMessages::SensorFaultEventMessage::RawData msg(sensor_id);
+                    publisher.send(zmq::message_t(
+                        EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SENSOR_FAULT).data(),
+                        EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SENSOR_FAULT).size()),
+                        zmq::send_flags::sndmore
+                    );
+                    publisher.send(zmq::message_t(&msg, sizeof(EventMessages::SensorFaultEventRawData)));
                 }
             }
         }
@@ -1300,7 +1380,7 @@ int main(void)
                 }
                 ImGui::SameLine();
                 {
-                    const char* items[] = { "Here", "SendResponse" };
+                    const char* items[] = { "Here", "SendResponse", "SensorFault" };
                     const char* combo_preview_value = items[event_selection_idx];
                     ImGui::SetNextItemWidth(frame_height * 8.0f + item_inner_spacing * 2.0f);
                     if (ImGui::BeginCombo("##Event", combo_preview_value))
@@ -1338,6 +1418,13 @@ int main(void)
                         event_server.send_message_queue_.push(std::pair<EventMessages::EventType, std::shared_ptr<void>>{
                             EventMessages::EventType::SEND_RESPONSE,
                                 std::shared_ptr<void>(new EventMessages::ResponseEventRawData(EventMessages::ResponseType::CONTINUE, message_text))
+                        });
+                    }
+                    else if (event_selection_idx == 2)
+                    {
+                        event_server.send_message_queue_.push(std::pair<EventMessages::EventType, std::shared_ptr<void>>{
+                            EventMessages::EventType::SENSOR_FAULT,
+                                std::shared_ptr<void>(new EventMessages::SensorFaultEventRawData(TrussStructureMessage::SensorID::MOD_2_ELONG_1))
                         });
                     }
                 }
