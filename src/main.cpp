@@ -763,8 +763,8 @@ struct EventServer {
                 //TODO add inserted message to UI display?
             }
 
-            // Poll for incoming messages with 100ms timeout
-            zmq::poll(items, 100);
+            // Poll for incoming messages with 1ms timeout
+            zmq::poll(items, 1);
 
             if (items.front().revents & ZMQ_POLLIN)
             {
@@ -911,7 +911,7 @@ struct EventServer {
                 auto pkt_info = iris::get_packet_info(receiver.message);
                 assert(pkt_info != nullptr);
                 std::string dest_ip = ::inet_ntop(AF_INET, &pkt_info->ipi_addr, group.data(), group.size());
-                std::cout << "Received via " << dest_ip << std::endl;
+                //std::cout << "Received via " << dest_ip << std::endl;
                 receiver.message.dwFlags = 0;
                 events[r].ResetEvent();
 
@@ -923,13 +923,17 @@ struct EventServer {
                 // forward message to zmq subscribers
                 auto sensor_ids = TrussStructureFaultMessage::getSensorIDs(fault_class);
                 for (auto& sensor_id : sensor_ids) {
-                    EventMessages::SensorFaultEventMessage::RawData msg(sensor_id);
-                    publisher.send(zmq::message_t(
-                        EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SENSOR_FAULT).data(),
-                        EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SENSOR_FAULT).size()),
-                        zmq::send_flags::sndmore
-                    );
-                    publisher.send(zmq::message_t(&msg, sizeof(EventMessages::SensorFaultEventRawData)));
+                    //EventMessages::SensorFaultEventMessage::RawData msg(sensor_id);
+                    //publisher.send(zmq::message_t(
+                    //    EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SENSOR_FAULT).data(),
+                    //    EventMessages::envelope(EventMessages::Receiver::HOLOLENS, EventMessages::EventType::SENSOR_FAULT).size()),
+                    //    zmq::send_flags::sndmore
+                    //);
+                    //publisher.send(zmq::message_t(&msg, sizeof(EventMessages::SensorFaultEventRawData)));
+                        send_message_queue_.push(std::pair<EventMessages::EventType, std::shared_ptr<void>>{
+                        EventMessages::EventType::SENSOR_FAULT,
+                            std::shared_ptr<void>(new EventMessages::SensorFaultEventRawData(sensor_id))
+                    });
                 }
             }
         }
